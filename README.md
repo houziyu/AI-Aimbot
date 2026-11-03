@@ -1,267 +1,270 @@
-> [!CAUTION]
-> # This tool is No Longer Supported by RootKit
-> We will not offer help for issues that arise with this program, or assist in getting it running on your machine.
-> You are free to fork and edit this tool yourself.
-
-# 🎯 World's Best AI Aimbot 🎮
-
-![World's Best AI Aimbot Banner](imgs/banner.png)
-
-[![Pull Requests Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](https://makeapullrequest.com)
-
-
-Want to make your own bot? Then use the [Starter Code Pack](https://github.com/RootKit-Org/AI-Aimbot-Starter-Code)!
---
---
-## 🙌 Welcome Aboard!
-We're a charity on a mission to educate and certify the upcoming wave of developers in the world of Computer Engineering 🌍. ~~Need assistance? Hop into our [Discord](https://discord.gg/rootkitorg) and toss your questions at `@Wonder` in the *#ai-aimbot channel* (be sure to stick to this channel or face the consequences! 😬). Type away your query and include `@Wonder` in there.~~
-
-Our *AI Aimbot* 🤖 sharpshoots targets in **any game with humanoid characters**, harnessing the power of [YOLOv5](https://github.com/ultralytics). Currently, it's a ninja against anti-cheat systems, as it's visual-only. Still, watch out for manual player reports! 👀
-
-Intended for educational use 🎓, our aim is to highlight the vulnerability of game devs to AI-driven cheats. Pass it along to your game developer buddies, and save their games from being outsmarted!
-
-**⚠ Use at your own risk! If you're caught... well, you've been warned!**
-
-## 📹 Instructional Media
-- [Watch the tutorial video (Works But Outdated)](https://www.youtube.com/watch?v=TCJHLbbeLhg)
-- [Watch the live stream explainer (Works But Outdated)](https://www.youtube.com/watch?v=uniL5yR7y0M&ab_channel=RootKit)
-- [Join the Discord](https://discord.gg/rootkitorg)
-
-## There are 3 Versions 🚀🚦🖥️
-- Fast 🏃‍♂️ - `main.py` ✅ Easy to set up, Works on any computer 💻
-- Faster 🏃‍♂️💨 - `main_onnx.py` ⚙️ May need to edit a file, Works on any computer 💻
-- Fastest 🚀 - `main_tensorrt.py` 🏢 Enterprise level hard, Works on computers with Nvidia GPUs only 🎮
-
-## 🧰 Requirements
-- Nvidia RTX 980 🆙, higher or equivalent
-- And one of the following:
-  - Nvidia CUDA Toolkit 11.8 [DOWNLOAD HERE](https://developer.nvidia.com/cuda-11-8-0-download-archive)
-
-## 🚀 Pre-setup Steps
-1. Download and Unzip the AI Aimbot and stash the folder somewhere handy 🗂️.
-2. Ensure you've got Python installed (like a pet python 🐍) – grab version 3.11 [HERE](https://www.python.org/downloads/release/python-3116/).
-   - 🛑 Facing a `python is not recognized...` error? [WATCH THIS!](https://youtu.be/E2HvWhhAW0g)
-   - 🛑 Is it a `pip is not recognized...` error? [WATCH THIS!](https://youtu.be/zWYvRS7DtOg)
-3. Fire up `PowerShell` or `Command Prompt` on Windows 🔍.
-4. To install `PyTorch`, select the appropriate command based on your GPU.
-    - Nvidia `pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118`
-    - AMD or CPU `pip install torch torchvision torchaudio`
-5. 📦 Run the command below to install the required Open Source packages:
-```
-pip install -r requirements.txt
-```
-
-### 🐍 Running on Python 3.13
-
-The local Python 3.13 validation environment uses the package versions recorded in
-`constraints-py313.txt`. Install PyTorch first, then install the DirectML environment below.
-TensorRT is a separate optional installation; the bundled adapter requires TensorRT 8 and
-an engine exported for the matching GPU/runtime. It is not part of the Python 3.13 validation set.
-
-```powershell
-# CUDA build (match the index to your driver; cu128 works for RTX 30xx/40xx)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-pip install -r requirements-py313.txt
-```
-
-Notes for 3.13 (and modern PyTorch/NumPy generally):
-
-- `main.py` now loads `yolov5s.pt` through the bundled `models/` package instead of `torch.hub`.
-  The weights download automatically on first run; set `modelWeights` in `config.py` to pick a size.
-- `main_onnx.py` needs `onnxChoice = 2` (DirectML) or `3` (CUDA) to use your GPU.
-- If you use `onnxChoice = 3`, install `requirements-onnx-cuda.txt` in a separate environment.
-  Choose one ONNX Runtime distribution per environment; do not combine CPU, DirectML, and CUDA wheels.
-  The shared runtime does not require CuPy.
+# AI-Aimbot：基于 YOLOv5 的屏幕视觉识别与辅助控制
 
-## 🔌 How to Run (Fast 🏃‍♂️ Version)
-Follow these steps **after** Python and all packages have been installed:
+> [!IMPORTANT]
+> 原项目 RootKit 已停止维护，不再提供安装指导或故障支持。本分支包含后续的兼容性修复与运行流程优化，相关用法以本文及当前代码为准。
 
-1. Open `PowerShell` ⚡ or `Command Prompt` 💻.
-2. Input `cd `, then drag & drop the folder containing the bot code into the terminal.
-3. Hit Enter ↩️.
-4. Type `python main.py` and press Enter.
-5. Use **CAPS_LOCK** to toggle the aimbot 🎯. It begins in the *off* state.
-6. Pressing `q` 💣 at **ANY TIME** will shut down the program.
+项目通过截取指定窗口中心区域，使用 YOLOv5 检测人物，再根据配置进行目标选择、可视化和鼠标辅助控制。原作者将其定位为教育与研究项目，使用时请遵守相关游戏与平台的规则。
 
-## 🔌 How to Run (Faster 🏃‍♂️💨 Version)
-Follow these steps **after** Python and all packages have been installed:
+## 运行方式
 
-1. Open the `config.py` 📄 file and tweak the `onnxChoice` variable to correspond with your hardware specs:
-    - `onnxChoice = 1` # CPU ONLY 🖥
-    - `onnxChoice = 2` # AMD/NVIDIA ONLY 🎮
-    - `onnxChoice = 3` # NVIDIA ONLY 🏎️
-2. Install the matching backend in your environment (choose one):
-    ```
-    # onnxChoice = 1
-    python -m pip install -r requirements-onnx-cpu.txt
-    # onnxChoice = 2
-    python -m pip install -r requirements-onnx-directml.txt
-    # onnxChoice = 3 (requires a compatible CUDA/cuDNN installation)
-    python -m pip install -r requirements-onnx-cuda.txt
-    ```
-3. Follow the same steps as for the Fast 🏃‍♂️ Version above except for step 4, you will run `python main_onnx.py` instead.
+三个入口共用同一套图像处理、目标选择、预览与资源清理流程，主要区别在于推理后端。实际速度取决于硬件、模型和运行环境。
 
+| 入口 | 推理后端 | 适用环境 |
+| --- | --- | --- |
+| `main.py` | PyTorch | 有可用 CUDA 时使用 NVIDIA GPU，否则使用 CPU |
+| `main_onnx.py` | ONNX Runtime | 通过配置选择 CPU、DirectML 或 CUDA |
+| `main_tensorrt.py` | TensorRT 8 | NVIDIA CUDA GPU，以及与环境匹配的 TensorRT 引擎 |
 
-## 🔌 How to Run (Fastest 🚀 Version)
-Follow these sparkly steps to get your TensorRT ready for action! 🛠️✨
+截图与输入控制依赖 Windows API，因此根目录的三个入口面向 Windows 环境。共用运行流程不需要 CuPy。
 
-1. **Introduction** 🎬
-   Watch the TensorRT section of the setup [video 🎥](https://www.youtube.com/watch?v=uniL5yR7y0M&ab_channel=RootKit) before you begin. It's loaded with useful tips!
+## 安装
 
-2. **Oops! Don't Forget the Environment** 🌱
-   We forgot to mention adding environmental variable paths in the video. Make sure to do this part!
+### 1. 创建 Python 环境
 
-3. **Get Support If You're Stumped** 🤔
-   If you ever feel lost, you can always `@Wonder` your questions in our [Discord 💬](https://discord.gg/rootkitorg). Wonder is here to help!
+本地验证使用 Python 3.13；对应依赖版本记录在 `constraints-py313.txt`。TensorRT 不属于这套验证环境，需要单独准备与其绑定兼容的 Python、CUDA 和 TensorRT 环境。
 
-4. **Use the shared runtime**
-    The TensorRT entry point uploads RGB input directly with PyTorch. CuPy is not required.
+在项目根目录打开 PowerShell：
 
-5. **CUDNN Installation** 🧩
-   Click to install [CUDNN 📥](https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.6/local_installers/11.x/cudnn-windows-x86_64-8.9.6.50_cuda11-archive.zip/). You'll need a Nvidia account to proceed. Don't worry it's free.
+~~~powershell
+py -3.13 -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+~~~
 
-6. **Unzip and Relocate** 📁➡️
-   Open the .zip CuDNN file and move all the folders/files to where the CUDA Toolkit is on your machine, usually at `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8`.
+如果 PowerShell 无法执行激活脚本，可以用 `.\venv\Scripts\python.exe` 代替下文命令中的 `python`，直接使用虚拟环境。
 
-7. **Get TensorRT 8.6 GA** 🔽
-   Fetch [`TensorRT 8.6 GA 🛒`](https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/zip/TensorRT-8.6.1.6.Windows10.x86_64.cuda-11.8.zip).
+### 2. 安装 PyTorch
 
-8. **Unzip and Relocate** 📁➡️
-   Open the .zip TensorRT file and move all the folders/files to where the CUDA Toolkit is on your machine, usually at `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8`.
+先安装所需的 PyTorch 构建，再安装项目依赖，以保留所选的 CPU 或 CUDA 版本。
 
-9. **Python TensorRT Installation** 🎡
-   Once you have all the files copied over, you should have a folder at `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\python`. If you do, good, then run the following command to install TensorRT in python.
-   ```
-   pip install "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\python\tensorrt-8.6.1-cp311-none-win_amd64.whl"
-   ```
-    🚨 If the following steps didn't work, don't stress out! 😅 The labeling of the files corresponds with the Python version you have installed on your machine. We're not looking for the 'lean' or 'dispatch' versions. 🔍 Just locate the correct file and replace the path with your new one. 🔄 You've got this! 💪
+NVIDIA GPU 的本地验证环境使用 CUDA 12.8 构建，以下为对应命令示例。其他环境应选择与驱动兼容的构建：
 
-10. **Set Your Environmental Variables** 🌎
-   Add these paths to your environment:
-   - `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\lib`
-   - `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\libnvvp`
-   - `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin`
+~~~powershell
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+~~~
 
-11. **Download Pre-trained Models** 🤖
-   You can use one of the .engine models we supply. But if it doesn't work, then you will need to re-export it. Grab the `.pt` file here for the model you want. We recommend `yolov5s.py` or `yolov5m.py` [HERE 🔗](https://github.com/ultralytics/yolov5/releases/tag/v7.0).
+使用 CPU，或仅通过 DirectML 运行 ONNX 时，可以安装 CPU 构建：
 
-12. **Run the Export Script** 🏃‍♂️💻
-   Time to execute `export.py` with the following command. Patience is key; it might look frozen, but it's just concentrating hard! Can take up to 20 minutes.
-   
-   ```
-   python .\export.py --weights ./yolov5s.pt --include engine --half --imgsz 320 320 --device 0
-   ```
-   
-   Note: You can pick a different YOLOv5 model size. TensorRT's power allows for larger models if desired!
+~~~powershell
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+~~~
 
-If you've followed these steps, you should be all set with TensorRT! ⚙️🚀
+### 3. 安装项目依赖
 
+仅使用 PyTorch 入口：
 
-## ⚙️ Configurable Settings
+~~~powershell
+python -m pip install -r requirements.txt
+~~~
 
-*Default settings are generally great for most scenarios. Check out the comments in the code for more insights. 🔍 The configuration settings are now located in the `config.py` file!<br>
-**CAPS_LOCK is the default for flipping the switch on the autoaim superpower! ⚙️ 🎯**
+使用本地验证过的 Python 3.13 依赖组合：
 
-`useMask` - Set to `True` or `False` to turn on and off 🎭
+~~~powershell
+python -m pip install -r requirements-py313.txt
+~~~
 
-`maskWidth` - The width of the mask to use. Only used when `useMask` is `True` 📐
+`requirements-py313.txt` 会应用版本约束，并安装 DirectML 版 ONNX Runtime。安装它不会自动修改 `config.py`：运行 ONNX 时，默认的 `onnxChoice = 1` 仍表示使用 CPU；要使用 DirectML，需改为 `2`。
 
-`maskHeight` - The height of the mask to use. Only used when `useMask` is `True` 📐
+也可以根据需要单独选择 ONNX 环境：
 
-`aaQuitKey` - The go-to key is `q`, but if it clashes with your game style, swap it out! ⌨️♻️
+| `onnxChoice` | 推理设备 | 安装命令 |
+| --- | --- | --- |
+| `1` | CPU | `python -m pip install -r requirements-onnx-cpu.txt` |
+| `2` | 支持 DirectML 的 GPU | `python -m pip install -r requirements-onnx-directml.txt` |
+| `3` | NVIDIA CUDA GPU | `python -m pip install -r requirements-onnx-cuda.txt` |
 
-`headshot_mode` - Set to `False` if you're aiming to keep things less head-on and more centered. 🎯➡️👕
+**一个虚拟环境只安装一种 ONNX Runtime 发行包。** CPU、DirectML、CUDA 发行包共享 `onnxruntime` 导入名称，请使用独立环境切换，避免混装。CUDA 版还需要匹配的 CUDA/cuDNN 运行环境。
 
-`cpsDisplay` - Toggle off with `False` if you prefer not to display the CPS in your command station. 💻🚫
+程序导入模块时不会自动调用 pip 安装或升级依赖。缺少依赖时，应根据报错安装后重新启动。
 
-`visuals` - Flip to `True` to witness the AI's vision! Great for sleuthing out any hiccups. 🕵️‍♂️✅
+## 启动与操作
 
-`aaMovementAmp` - The preset should be on point for 99% of players. Lower the digits for smoother targeting. Recommended doses: `0.5` - `2`. ⚖️🕹️
+在项目根目录运行对应入口，三者任选一个：
 
-`confidence` - Stick with the script here unless you're the expert. 🧐✨
+~~~powershell
+# PyTorch
+python main.py
 
-`screenShotHeight` - Same as above, no need for changes unless you've got a specific vision. 📏🖼️
+# ONNX Runtime
+python main_onnx.py
 
-`screenShotWidth` - Keep it constant as is, unless you've got reasons to adjust. 📐🖼️
+# TensorRT
+python main_tensorrt.py
+~~~
 
-`aaDetectionBox` - Default's your best bet, change only if you've got the know-how. 📦✅
+程序先显示实际使用的后端、设备或执行提供程序、输入尺寸及精度，并完成模型预热。随后列出可选择的窗口，输入编号即可。
 
-`onnxChoice` - Gear up for the right graphics card—Nvidia, AMD, or CPU power! 💻👾
+- **Caps Lock**：按系统的 Caps Lock 开关状态启用或停用辅助控制。启动前可先将其关闭。
+- **Q**：默认退出键，可通过 `aaQuitKey` 修改。
+- **Ctrl+C**：在终端中中断运行。
+- 启用预览后，预览窗口也使用配置的退出键。
+- 选中窗口失去焦点、最小化，或截图区域超出所选显示输出时，截图和辅助控制暂停；满足条件后恢复。
+- 在同一显示输出内移动窗口时，截图区域跟随窗口客户区中心更新。推理完成后也会再次检查窗口状态，避免对已移动或失焦的窗口执行旧结果。
 
-`centerOfScreen` - Keep this switched on to stay in the game's heart. ❤️🖥️
+正常退出、预览退出、中断及运行异常都会进入资源清理流程，释放截图设备并关闭预览窗口。
 
-## 📊 Current Stats
+## 配置说明
 
-The bot's efficiency depends on your setup. We achieved 100-150 CPS with our test specs below 🚀.
+配置集中在 `config.py`。以下为当前默认值。
 
-    - AMD Ryzen 7 2700
-    - 64 GB DDR4
-    - Nvidia RTX 3080
+### 图像与遮罩
 
-💡 Tip: Machine Learning can be tricky, so reboot if you keep hitting CUDA walls.
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `screenShotWidth` | `320` | 窗口中心截图区域的宽度，单位为像素 |
+| `screenShotHeight` | `320` | 窗口中心截图区域的高度，单位为像素 |
+| `useMask` | `False` | 是否启用遮罩，遮罩区域不会送入有效图像内容 |
+| `maskSide` | `"left"` | 遮罩位于左下角或右下角，可选 `"left"`、`"right"`，不区分大小写 |
+| `maskWidth` | `80` | 遮罩宽度；启用遮罩时须大于 0，且不超过截图宽度 |
+| `maskHeight` | `200` | 遮罩高度；启用遮罩时须大于 0，且不超过截图高度 |
 
-## 🤝 Community Based
+截图的 BGRA/BGR 数据会统一转换为模型使用的 RGB 通道顺序；预览仍使用 BGR。遮罩和图像处理不会修改截图模块返回的原始数据。
 
-We're all about collaboration. Your contributions can earn you credit and potential 💰!
+### 检测与辅助控制
 
-**Want to volunteer? Have video or program ideas? Tell us!**
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `confidence` | `0.4` | 检测置信度阈值，范围为 0～1 |
+| `iouThreshold` | `0.45` | NMS 重叠框抑制阈值，独立于置信度阈值，范围为 0～1 |
+| `maxDetections` | `100` | 每帧最多保留的检测框数量 |
+| `centerOfScreen` | `True` | 没有上一帧目标时，优先选择距截图中心最近的目标 |
+| `aaMovementAmp` | `0.4` | 鼠标位移倍率，须为非负有限数值 |
+| `headshot_mode` | `True` | 将控制点向检测框上方偏移；关闭后仍保留较小的向上偏移 |
+| `aaQuitKey` | `"Q"` | 全局及预览退出键，支持一个 ASCII 字母或数字，不区分大小写 |
 
-## ⚠️ Known Cheat-Detectable Games
+有上一帧目标时，会优先选择距其坐标最近的当前目标。没有检测结果、截图暂停或截图区域改变时，会清空上一帧目标。关闭 `centerOfScreen` 后，首次选择使用检测结果的原有顺序。
 
-Splitgate (reported by a Discord user 🕵️‍♂️), EQU8 detects win32 mouse movement library.
+当前后处理按类别 `0` 筛选目标。使用自定义模型时，应确认类别映射与这项约定一致。
 
-## 🚀 Custom Aimbots and Models
+### 模型与推理后端
 
-Show off your work or new models via Pull Requests in `customScripts` or `customModels` directories, respectively. Check out the `example-user` folder for guidance.
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `modelWeights` | `"yolov5s.pt"` | PyTorch 入口使用的权重文件；标准 YOLOv5 权重缺失时会尝试下载 |
+| `onnxWeights` | `"yolov5s320Half.onnx"` | ONNX 入口使用的本地模型文件 |
+| `tensorrtWeights` | `"yolov5s320Half.engine"` | TensorRT 入口使用的本地引擎文件 |
+| `onnxChoice` | `1` | `1`：CPU；`2`：DirectML；`3`：CUDA，仅影响 ONNX 入口 |
 
-## 🌠 Future Ideas
+相对模型路径以项目根目录为基准解析，不依赖启动命令所在的目录。
 
- - [x] Mask Player to avoid false positives
+- PyTorch 截图尺寸必须是模型步长的整数倍。
+- ONNX 会读取模型声明的输入名、数据类型和尺寸，支持浮点单精度与半精度输入。
+- 本地默认 ONNX 模型的输入为 `[1, 3, 320, 320]`、`float16`。固定尺寸模型必须与配置的截图尺寸一致，修改截图尺寸前应检查模型。
+- TensorRT 引擎的输入尺寸也会在启动时检查。
+- 指定的 ONNX 执行提供程序不可用，或未实际启用时，程序会报错，不会静默切换到 CPU。
 
+### 截图频率与缓冲区
 
-Happy Coding and Aiming! 🎉👾
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `captureFps` | `120` | 目标截图频率；实际频率受画面变化和运行环境影响 |
+| `captureBuffer` | `4` | 循环截图缓冲区的容量，单位为帧，至少为 2 |
+| `captureDevice` | `0` | BetterCam 截图适配器编号 |
+| `captureOutput` | `None` | 显示输出编号，`None` 选择该适配器的主输出 |
 
+**缓冲容量不等于截图频率。** `captureBuffer = 4` 表示最多容纳 4 帧，不代表每秒只截图 4 张；同样，原来的 512 帧缓冲也不代表每秒截图 512 张。
 
-## Shared runtime and validation
+缓冲区循环覆盖旧帧，程序读取最新截图，不会等待缓冲区填满，也不会依次补算积压的旧帧。按默认 `320 × 320`、BGRA 每像素 4 字节计算：
 
-The three root entry points share `app.py`, `runtime.py`, and `inference.py`. They use the same
-RGB conversion, pixel coordinates, NMS thresholds, target selection, preview, and cleanup.
-Community examples under `customScripts/` remain independent examples.
+| 缓冲容量 | 帧缓冲数据量 |
+| --- | --- |
+| 512 帧 | 约 200 MiB |
+| 4 帧 | 约 1.56 MiB |
 
-- Set `onnxWeights` / `tensorrtWeights` to change exported models. Relative model paths resolve
-  from the project directory. ONNX reads the input name, precision, and shape from the model.
-  A fixed-size model must match `screenShotWidth` / `screenShotHeight`; incompatible settings
-  fail before capture starts. PyTorch image sizes must be multiples of the model stride.
-- `confidence` controls detection confidence; `iouThreshold` separately controls NMS overlap.
-  `maxDetections` caps the retained boxes. With no previous target, `centerOfScreen` prefers
-  the closest target to the center; subsequent frames prefer the nearest previous coordinates.
-  An empty frame, capture pause, or crop change resets the previous target.
-- `captureBuffer = 4` uses about 1.6 MiB at 320 x 320 BGRA. `captureFps` caps acquisition.
-  Only changed desktop frames are processed, so CPS can be lower on a static screen.
-- Capture follows the selected window's client area. Minimizing it, switching focus, or moving
-  the crop outside the selected output pauses capture and mouse control. Returning resumes it.
-  `captureDevice` and `captureOutput` select the capture adapter/output; `None` uses the primary
-  output. Moving across monitors pauses until the window returns to the selected output.
-- The global quit key accepts a single ASCII letter or digit (case insensitive). The preview
-  uses the same configured key. Caps Lock uses its toggle state. Exceptions, Ctrl+C, and preview
-  exit all release capture and close preview windows. The static-desktop wait is bounded so
-  the quit key remains responsive.
-- `performanceDisplay = True` prints rolling mean and P95 times for capture, preprocessing,
-  inference, postprocessing, and the complete iteration. CUDA synchronization makes stage
-  timings meaningful but adds profiling overhead. `cpsDisplay` remains independently configurable.
-- Startup prints the actual backend, provider/device, input size, and precision, then warms up
-  the model. An unavailable requested ONNX provider is reported rather than silently selecting CPU.
-- Dependencies must be installed explicitly; imports do not invoke pip. `requirements.txt`
-  contains common dependencies and `requirements-onnx-*.txt` selects an optional ONNX backend.
-  `requirements-py313.txt` applies the locally validated constraints and includes DirectML.
+上述数值仅指帧缓冲数据，不包含模型、截图设备及其他运行内存。对当前读取最新帧的流程，较小缓冲主要减少内存占用，不能据此直接推算 FPS 提升。
 
-Run offline regression tests without opening capture or moving the mouse:
+共用流程只处理截图模块取得的变化帧，静止画面下 CPS 较低属于正常情况。将窗口移到其他显示器后，如果截图区域超出所选输出，会暂停；应将窗口移回，或退出后重新配置 `captureDevice` / `captureOutput`。
 
-```powershell
+### 预览与性能统计
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `visuals` | `False` | 是否显示检测框预览 |
+| `cpsDisplay` | `True` | 是否输出每秒完成的处理次数 |
+| `performanceDisplay` | `False` | 是否输出各阶段的滚动平均耗时和 P95 耗时 |
+
+开启 `performanceDisplay` 后，会输出截图、预处理、推理、后处理及完整单次循环的耗时。P95 表示样本中约 95% 的耗时不超过该值，可用于观察偶发卡顿。
+
+CUDA 阶段计时会执行必要的设备同步，因此性能分析本身会增加开销。比较日常运行速度时，应保持相同的模型、截图尺寸、预览和统计配置。CPS 不是游戏 FPS，也不等同于单独的模型推理速度。
+
+## TensorRT 环境与引擎导出
+
+当前适配器使用 TensorRT 8 的绑定接口，需要可用的 CUDA GPU、本地 TensorRT 运行库及匹配的 Python 绑定。它不属于上面的 Python 3.13 验证环境，不能直接套用不同 Python、CUDA 或 TensorRT 版本的安装包。
+
+仓库附带的 `.engine` 文件不保证适配所有设备和运行库。如果加载失败，应在目标环境中使用 `export.py` 重新导出。例如：
+
+~~~powershell
+python export.py --weights ./yolov5s.pt --include engine --half --imgsz 320 320 --device 0
+~~~
+
+该示例生成的文件名为 `yolov5s.engine`。导出完成后，在 `config.py` 中将 `tensorrtWeights` 改为该文件名，并保持截图尺寸与导出尺寸一致。
+
+原项目的 TensorRT 教程使用 CUDA 11.8、TensorRT 8.6 与 Python 3.11 绑定，仅供对应旧环境参考，不代表当前所有环境都应安装这一组合。
+
+## 项目结构
+
+| 路径 | 用途 |
+| --- | --- |
+| `main.py`、`main_onnx.py`、`main_tensorrt.py` | 三个运行入口 |
+| `app.py` | 共用主循环、输入控制、预览与退出清理 |
+| `runtime.py` | 配置校验、颜色转换、检测框处理、目标选择及性能统计 |
+| `inference.py` | PyTorch、ONNX 和 TensorRT 推理适配 |
+| `gameSelection.py` | 窗口选择与截图会话，保留旧版三元组接口 |
+| `config.py` | 用户配置 |
+| `models/`、`utils/` | 随仓库提供的 YOLOv5 模型与工具代码 |
+| `tests/` | 离线回归测试 |
+| `customScripts/` | 社区独立脚本示例，不等同于根目录的共用运行流程 |
+| `customModels/` | 社区模型说明与示例 |
+| `Conda/` | 原项目的 Conda 安装资料 |
+
+## 测试与验证范围
+
+在项目根目录运行：
+
+~~~powershell
 python -m unittest discover -s tests -v
-```
+~~~
 
-The tests cover color/layout conversion, masking, coordinates and target selection, model
-metadata, unavailable providers, window moves/focus changes, timeout handling, and cleanup.
-Actual CUDA/DirectML/TensorRT execution additionally depends on the installed driver/runtime;
-unit tests use fakes for Windows capture and input.
+回归测试涵盖颜色通道、遮罩、像素坐标、跨帧目标选择、配置与模型元数据检查、推理提供程序检查、窗口移动与焦点变化、静态画面等待，以及异常退出清理。
+
+本地已完成 PyTorch CPU/CUDA、ONNX CPU/DirectML 的离线模型推理验证，并验证了 CUDA 半精度非空检测结果的后处理。TensorRT 尚未在本地实测。
+
+Windows 截图和输入控制的单元测试使用模拟对象，不会启动实际截图或移动鼠标。离线推理与回归测试不代表游戏实景中的识别精度、整体帧率或完整兼容性验证。
+
+## 常见问题
+
+**安装了 DirectML，运行 ONNX 仍然显示 CPU？**
+
+检查 `config.py` 的 `onnxChoice` 是否为 `2`。安装依赖不会自动修改配置，启动时显示的执行提供程序才是实际选择结果。
+
+**修改截图尺寸后无法启动？**
+
+检查模型的固定输入尺寸。默认 ONNX 模型要求 `320 × 320`；PyTorch 要求尺寸为模型步长的整数倍；TensorRT 引擎也需要匹配的输入尺寸。
+
+**为什么窗口切换后不再输出控制？**
+
+共用流程只在所选窗口位于前台且截图区域有效时执行控制。切回该窗口、恢复窗口大小或将窗口移回所选显示输出后，会恢复处理。
+
+**为什么画面不动时 CPS 下降？**
+
+共用流程不重复推理未变化的截图。CPS 统计的是实际完成的处理次数，画面静止时不需要维持与目标截图频率相同的处理次数。
+
+**缺少模型或依赖怎么办？**
+
+按报错检查对应文件与依赖清单。标准 PyTorch 权重可以按原有下载逻辑获取；ONNX 模型与 TensorRT 引擎需要在配置路径下存在。依赖须自行安装，程序不会在导入阶段修改环境。
+
+## 原项目资料与社区内容
+
+以下资料来自原项目，可能与本分支的安装方式或代码结构不同：
+
+- [基础代码包](https://github.com/RootKit-Org/AI-Aimbot-Starter-Code)
+- [原入门视频（内容较旧）](https://www.youtube.com/watch?v=TCJHLbbeLhg)
+- [原直播讲解（内容较旧）](https://www.youtube.com/watch?v=uniL5yR7y0M&ab_channel=RootKit)
+- [原社区 Discord](https://discord.gg/rootkitorg)
+- [YOLOv5 v7.0 权重发布页](https://github.com/ultralytics/yolov5/releases/tag/v7.0)
+
+自定义脚本和模型可以分别参考 `customScripts/`、`customModels/` 中的示例。原项目已停止提供支持，历史视频和社区链接不表示仍有维护或答疑承诺。
+
+## 许可证
+
+项目许可证见 [LICENSE](LICENSE)；随仓库提供的 YOLOv5 代码文件包含相应的许可证声明。
