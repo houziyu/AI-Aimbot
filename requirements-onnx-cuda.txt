@@ -1,0 +1,4 @@
+# Install CUDA-enabled PyTorch first. CuPy is not needed by the shared runtime.
+# Choose exactly one ONNX Runtime distribution per environment.
+-r requirements.txt
+onnxruntime-gpu

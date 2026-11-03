@@ -53,8 +53,10 @@ pip install -r requirements.txt
 
 ### 🐍 Running on Python 3.13
 
-The code also runs on Python 3.13, with one limitation: **`main_tensorrt.py` does not work**, because
-TensorRT has no cp313 Windows wheel. `main.py` and `main_onnx.py` both work.
+The local Python 3.13 validation environment uses the package versions recorded in
+`constraints-py313.txt`. Install PyTorch first, then install the DirectML environment below.
+TensorRT is a separate optional installation; the bundled adapter requires TensorRT 8 and
+an engine exported for the matching GPU/runtime. It is not part of the Python 3.13 validation set.
 
 ```powershell
 # CUDA build (match the index to your driver; cu128 works for RTX 30xx/40xx)
@@ -67,7 +69,9 @@ Notes for 3.13 (and modern PyTorch/NumPy generally):
 - `main.py` now loads `yolov5s.pt` through the bundled `models/` package instead of `torch.hub`.
   The weights download automatically on first run; set `modelWeights` in `config.py` to pick a size.
 - `main_onnx.py` needs `onnxChoice = 2` (DirectML) or `3` (CUDA) to use your GPU.
-- If you use `onnxChoice = 3`, install `pip install onnxruntime-gpu cupy-cuda12x`.
+- If you use `onnxChoice = 3`, install `requirements-onnx-cuda.txt` in a separate environment.
+  Choose one ONNX Runtime distribution per environment; do not combine CPU, DirectML, and CUDA wheels.
+  The shared runtime does not require CuPy.
 
 ## 🔌 How to Run (Fast 🏃‍♂️ Version)
 Follow these steps **after** Python and all packages have been installed:
@@ -86,12 +90,16 @@ Follow these steps **after** Python and all packages have been installed:
     - `onnxChoice = 1` # CPU ONLY 🖥
     - `onnxChoice = 2` # AMD/NVIDIA ONLY 🎮
     - `onnxChoice = 3` # NVIDIA ONLY 🏎️
-2. IF you have an NVIDIA set up, run the following
+2. Install the matching backend in your environment (choose one):
     ```
-    pip install onnxruntime-gpu
-    pip install cupy-cuda11x
+    # onnxChoice = 1
+    python -m pip install -r requirements-onnx-cpu.txt
+    # onnxChoice = 2
+    python -m pip install -r requirements-onnx-directml.txt
+    # onnxChoice = 3 (requires a compatible CUDA/cuDNN installation)
+    python -m pip install -r requirements-onnx-cuda.txt
     ```
-2. Follow the same steps as for the Fast 🏃‍♂️ Version above except for step 4, you will run `python main_onnx.py` instead.
+3. Follow the same steps as for the Fast 🏃‍♂️ Version above except for step 4, you will run `python main_onnx.py` instead.
 
 
 ## 🔌 How to Run (Fastest 🚀 Version)
@@ -106,8 +114,8 @@ Follow these sparkly steps to get your TensorRT ready for action! 🛠️✨
 3. **Get Support If You're Stumped** 🤔
    If you ever feel lost, you can always `@Wonder` your questions in our [Discord 💬](https://discord.gg/rootkitorg). Wonder is here to help!
 
-4. **Install Cupy**
-    Run the following `pip install cupy-cuda11x`
+4. **Use the shared runtime**
+    The TensorRT entry point uploads RGB input directly with PyTorch. CuPy is not required.
 
 5. **CUDNN Installation** 🧩
    Click to install [CUDNN 📥](https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.6/local_installers/11.x/cudnn-windows-x86_64-8.9.6.50_cuda11-archive.zip/). You'll need a Nvidia account to proceed. Don't worry it's free.
@@ -212,3 +220,48 @@ Show off your work or new models via Pull Requests in `customScripts` or `custom
 
 
 Happy Coding and Aiming! 🎉👾
+
+
+## Shared runtime and validation
+
+The three root entry points share `app.py`, `runtime.py`, and `inference.py`. They use the same
+RGB conversion, pixel coordinates, NMS thresholds, target selection, preview, and cleanup.
+Community examples under `customScripts/` remain independent examples.
+
+- Set `onnxWeights` / `tensorrtWeights` to change exported models. Relative model paths resolve
+  from the project directory. ONNX reads the input name, precision, and shape from the model.
+  A fixed-size model must match `screenShotWidth` / `screenShotHeight`; incompatible settings
+  fail before capture starts. PyTorch image sizes must be multiples of the model stride.
+- `confidence` controls detection confidence; `iouThreshold` separately controls NMS overlap.
+  `maxDetections` caps the retained boxes. With no previous target, `centerOfScreen` prefers
+  the closest target to the center; subsequent frames prefer the nearest previous coordinates.
+  An empty frame, capture pause, or crop change resets the previous target.
+- `captureBuffer = 4` uses about 1.6 MiB at 320 x 320 BGRA. `captureFps` caps acquisition.
+  Only changed desktop frames are processed, so CPS can be lower on a static screen.
+- Capture follows the selected window's client area. Minimizing it, switching focus, or moving
+  the crop outside the selected output pauses capture and mouse control. Returning resumes it.
+  `captureDevice` and `captureOutput` select the capture adapter/output; `None` uses the primary
+  output. Moving across monitors pauses until the window returns to the selected output.
+- The global quit key accepts a single ASCII letter or digit (case insensitive). The preview
+  uses the same configured key. Caps Lock uses its toggle state. Exceptions, Ctrl+C, and preview
+  exit all release capture and close preview windows. The static-desktop wait is bounded so
+  the quit key remains responsive.
+- `performanceDisplay = True` prints rolling mean and P95 times for capture, preprocessing,
+  inference, postprocessing, and the complete iteration. CUDA synchronization makes stage
+  timings meaningful but adds profiling overhead. `cpsDisplay` remains independently configurable.
+- Startup prints the actual backend, provider/device, input size, and precision, then warms up
+  the model. An unavailable requested ONNX provider is reported rather than silently selecting CPU.
+- Dependencies must be installed explicitly; imports do not invoke pip. `requirements.txt`
+  contains common dependencies and `requirements-onnx-*.txt` selects an optional ONNX backend.
+  `requirements-py313.txt` applies the locally validated constraints and includes DirectML.
+
+Run offline regression tests without opening capture or moving the mouse:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+The tests cover color/layout conversion, masking, coordinates and target selection, model
+metadata, unavailable providers, window moves/focus changes, timeout handling, and cleanup.
+Actual CUDA/DirectML/TensorRT execution additionally depends on the installed driver/runtime;
+unit tests use fakes for Windows capture and input.

@@ -1,0 +1,3 @@
+# Choose exactly one ONNX Runtime distribution per environment.
+-r requirements.txt
+onnxruntime-directml==1.24.4

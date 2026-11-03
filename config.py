@@ -38,3 +38,20 @@ modelWeights = "yolov5s.pt"
 # 2 - AMD
 # 3 - NVIDIA
 onnxChoice = 1
+
+# NMS overlap threshold, separate from detection confidence
+iouThreshold = 0.45
+maxDetections = 100
+
+# Model paths; relative paths are resolved from the project folder
+onnxWeights = "yolov5s320Half.onnx"
+tensorrtWeights = "yolov5s320Half.engine"
+
+# Capture settings; only the newest changed frame is processed
+captureFps = 120
+captureBuffer = 4
+captureDevice = 0
+captureOutput = None  # None selects the primary output; use an output index for other monitors
+
+# Print rolling average and P95 timings. GPU synchronization adds profiling overhead.
+performanceDisplay = False

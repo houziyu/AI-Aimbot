@@ -1,37 +1,5 @@
-# Python 3.13 / Windows install set for AI-Aimbot
-#
-# Verified on Python 3.13.12 + Windows 10.0.26100 + RTX 4060.
-#
-# Install PyTorch FIRST, with the CUDA index matching your driver (cu128 shown here):
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-#
-# Then install this file (the "fast" main.py and "faster" main_onnx.py both work):
-#   pip install -r requirements-py313.txt
-#
-# TensorRT is deliberately absent: there is no cp313 Windows wheel, so main_tensorrt.py
-# cannot be used on 3.13. Use main.py or main_onnx.py instead.
-
-# --- runtime deps from the original requirements.txt ---
-PyAutoGUI
-PyGetWindow
-opencv-python
-numpy
-pandas
-pywin32
-pyyaml
-tqdm
-matplotlib
-seaborn
-requests
-ipython
-psutil
-bettercam
-
-# DirectML lets main_onnx.py with onnxChoice = 2 run on any GPU (AMD/NVIDIA/Intel)
-onnxruntime-directml
-
-# --- compatibility pins required by this codebase on modern toolchains ---
-# utils/general.py used pkg_resources, removed in setuptools>=81.
-# The code now prefers 'packaging', but this keeps the legacy path working too.
-setuptools<81
-packaging
+# Local Python 3.13 / Windows validation set.
+# Install the desired CUDA/CPU PyTorch build FIRST as described in README.md.
+# This default includes DirectML; select onnxChoice=2 to use it.
+-c constraints-py313.txt
+-r requirements-onnx-directml.txt

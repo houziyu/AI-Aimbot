@@ -7,10 +7,7 @@ import os
 import warnings
 from pathlib import Path
 
-try:
-    from packaging.version import parse as parse_version
-except ImportError:  # packaging missing, fall back to the legacy API
-    from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 
 import torch
 

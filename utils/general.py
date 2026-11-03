@@ -35,22 +35,23 @@ import torch
 import torchvision
 import yaml
 
-# pkg_resources was removed from setuptools>=81, prefer packaging which is always present with pip
-try:
-    from packaging.version import parse as parse_version
-except ImportError:  # packaging missing, fall back to the legacy API
-    from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 
-# Import 'ultralytics' package or install if if missing
+# Runtime imports must not install or upgrade the user's environment.
 try:
     import ultralytics
 
     assert hasattr(ultralytics, '__version__')  # verify package is not directory
-except (ImportError, AssertionError):
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-U', 'ultralytics'])  # install into this interpreter
-    import ultralytics
+except (ImportError, AssertionError) as exc:
+    raise ImportError("Install the project dependencies first: python -m pip install -r requirements.txt") from exc
 
-from ultralytics.utils.checks import check_requirements
+from ultralytics.utils.checks import check_requirements as _check_requirements
+
+
+def check_requirements(*args, **kwargs):
+    """Report missing optional dependencies without mutating the environment."""
+    kwargs['install'] = False
+    return _check_requirements(*args, **kwargs)
 
 from utils import TryExcept, emojis
 from utils.downloads import curl_download, gsutil_getsize
@@ -63,7 +64,7 @@ RANK = int(os.getenv('RANK', -1))
 # Settings
 NUM_THREADS = min(8, max(1, os.cpu_count() - 1))  # number of YOLOv5 multiprocessing threads
 DATASETS_DIR = Path(os.getenv('YOLOv5_DATASETS_DIR', ROOT.parent / 'datasets'))  # global datasets directory
-AUTOINSTALL = str(os.getenv('YOLOv5_AUTOINSTALL', True)).lower() == 'true'  # global auto-install mode
+AUTOINSTALL = False  # install dependencies explicitly, never during inference
 VERBOSE = str(os.getenv('YOLOv5_VERBOSE', True)).lower() == 'true'  # global verbose mode
 TQDM_BAR_FORMAT = '{l_bar}{bar:10}{r_bar}'  # tqdm bar format
 FONT = 'Arial.ttf'  # https://ultralytics.com/assets/Arial.ttf

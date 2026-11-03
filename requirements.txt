@@ -1,5 +1,7 @@
 PyAutoGUI
 PyGetWindow
+torch>=2.0
+torchvision>=0.15
 opencv-python
 numpy
 pandas
@@ -11,6 +13,7 @@ seaborn
 requests
 ipython
 psutil
-dxcam
-onnxruntime_directml
-bettercam
+bettercam==1.0.0
+ultralytics==8.4.199
+packaging
+Pillow

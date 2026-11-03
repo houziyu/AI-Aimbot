@@ -1,0 +1,21 @@
+# Versions present in the local Python 3.13 / Windows validation environment.
+# Install the desired CUDA/CPU PyTorch build first; these constraints preserve it.
+torch==2.11.0
+torchvision==0.26.0
+numpy==2.5.4
+pandas==3.1.0
+opencv-python==5.0.0.93
+PyGetWindow==0.0.9
+pywin32==312
+pyyaml==6.0.3
+tqdm==4.70.1
+matplotlib==3.11.2
+seaborn==0.13.2
+requests==2.34.2
+ipython==9.18.1
+psutil==7.2.2
+bettercam==1.0.0
+onnxruntime-directml==1.24.4
+ultralytics==8.4.199
+packaging==26.3
+Pillow==13.0.0
