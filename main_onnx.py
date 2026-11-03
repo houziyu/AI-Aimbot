@@ -80,7 +80,7 @@ def main():
                 # If the image has an alpha channel, remove it
                 im = im[:, :, :, :3]
             im = im / 255
-            im = im.astype(np.half)
+            im = im.astype(np.float16)
             im = np.moveaxis(im, 3, 1)
 
         # If Nvidia, do this

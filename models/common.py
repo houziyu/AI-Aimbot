@@ -557,7 +557,7 @@ class DetectMultiBackend(nn.Module):
             y = self.model.predict({'image': im})  # coordinates are xywh normalized
             if 'confidence' in y:
                 box = xywh2xyxy(y['coordinates'] * [[w, h, w, h]])  # xyxy pixels
-                conf, cls = y['confidence'].max(1), y['confidence'].argmax(1).astype(np.float)
+                conf, cls = y['confidence'].max(1), y['confidence'].argmax(1).astype(np.float32)  # np.float removed in NumPy 1.24
                 y = np.concatenate((box, conf.reshape(-1, 1), cls.reshape(-1, 1)), 1)
             else:
                 y = list(reversed(y.values()))  # reversed for segmentation models (pred, proto)
@@ -684,7 +684,9 @@ class AutoShape(nn.Module):
             p = next(self.model.parameters()) if self.pt else torch.empty(1, device=self.model.device)  # param
             autocast = self.amp and (p.device.type != 'cpu')  # Automatic Mixed Precision (AMP) inference
             if isinstance(ims, torch.Tensor):  # torch
-                with amp.autocast(autocast):
+                # torch.cuda.amp.autocast is deprecated in newer torch; only wrap when AMP is actually on
+                ctx = torch.amp.autocast('cuda', enabled=True) if autocast else contextlib.nullcontext()
+                with ctx:
                     return self.model(ims.to(p.device).type_as(p), augment=augment)  # inference
 
             # Pre-process

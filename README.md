@@ -51,6 +51,24 @@ Intended for educational use 🎓, our aim is to highlight the vulnerability of 
 pip install -r requirements.txt
 ```
 
+### 🐍 Running on Python 3.13
+
+The code also runs on Python 3.13, with one limitation: **`main_tensorrt.py` does not work**, because
+TensorRT has no cp313 Windows wheel. `main.py` and `main_onnx.py` both work.
+
+```powershell
+# CUDA build (match the index to your driver; cu128 works for RTX 30xx/40xx)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements-py313.txt
+```
+
+Notes for 3.13 (and modern PyTorch/NumPy generally):
+
+- `main.py` now loads `yolov5s.pt` through the bundled `models/` package instead of `torch.hub`.
+  The weights download automatically on first run; set `modelWeights` in `config.py` to pick a size.
+- `main_onnx.py` needs `onnxChoice = 2` (DirectML) or `3` (CUDA) to use your GPU.
+- If you use `onnxChoice = 3`, install `pip install onnxruntime-gpu cupy-cuda12x`.
+
 ## 🔌 How to Run (Fast 🏃‍♂️ Version)
 Follow these steps **after** Python and all packages have been installed:
 

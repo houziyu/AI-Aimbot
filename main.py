@@ -7,11 +7,12 @@ import win32con
 import pandas as pd
 import gc
 from utils.general import (cv2, non_max_suppression, xyxy2xywh)
+from models.common import AutoShape, DetectMultiBackend
 
 # Could be do with
 # from config import *
 # But we are writing it out for clarity for new devs
-from config import aaMovementAmp, useMask, maskWidth, maskHeight, aaQuitKey, screenShotHeight, confidence, headshot_mode, cpsDisplay, visuals, centerOfScreen
+from config import aaMovementAmp, useMask, maskWidth, maskHeight, aaQuitKey, confidence, headshot_mode, cpsDisplay, visuals, centerOfScreen, modelWeights
 import gameSelection
 
 def main():
@@ -23,8 +24,14 @@ def main():
     sTime = time.time()
 
     # Loading Yolo5 Small AI Model, for better results use yolov5m or yolov5l
-    model = torch.hub.load('ultralytics/yolov5', 'yolov5s',
-                           pretrained=True, force_reload=True)
+    # The bundled models/ package is used directly instead of torch.hub: the hub repo ships its own
+    # 'utils' package that collides with this project's 'utils', and torch>=2.11 additionally gates
+    # hub downloads behind an interactive trusted-repo prompt.
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    backend = DetectMultiBackend(modelWeights, device=device, dnn=False, data='', fp16=torch.cuda.is_available())
+    # AutoShape is what torch.hub returned before; it sets Detect.export=True so the output is the
+    # post-processed (n, 85) prediction tensor that non_max_suppression expects.
+    model = AutoShape(backend, verbose=False)
     stride, names, pt = model.stride, model.names, model.pt
 
     if torch.cuda.is_available():
@@ -51,21 +58,17 @@ def main():
                 else:
                     raise Exception('ERROR: Invalid maskSide! Please use "left" or "right"')
 
-            # Normalizing Data
-            im = torch.from_numpy(npImg)
-            if im.shape[2] == 4:
-                # If the image has an alpha channel, remove it
-                im = im[:, :, :3,]
+            # Normalizing Data - drop alpha into a copy so npImg stays intact for the visuals overlay
+            frame = npImg[:, :, :3] if npImg.shape[2] == 4 else npImg
 
-            im = torch.movedim(im, 2, 0)
-            if torch.cuda.is_available():
+            # Scale to 0-1 and lay out as BCHW, matching what the model was trained on
+            im = np.ascontiguousarray(frame.transpose(2, 0, 1))[None]
+            im = torch.from_numpy(im).to(device).float() / 255
+            if backend.fp16:
                 im = im.half()
-                im /= 255
-            if len(im.shape) == 3:
-                im = im[None]
 
             # Detecting all the objects
-            results = model(im, size=screenShotHeight)
+            results = model(im)
 
             # Suppressing results that dont meet thresholds
             pred = non_max_suppression(
@@ -131,6 +134,8 @@ def main():
 
             # See what the bot sees
             if visuals:
+                # bettercam hands back BGRA; draw on the 3-channel view that matches the colors
+                displayFrame = frame.copy()
                 # Loops over every item identified and draws a bounding box
                 for i in range(0, len(targets)):
                     halfW = round(targets["width"][i] / 2)
@@ -145,10 +150,10 @@ def main():
                     # draw the bounding box and label on the frame
                     label = "{}: {:.2f}%".format(
                         "Human", targets["confidence"][i] * 100)
-                    cv2.rectangle(npImg, (startX, startY), (endX, endY),
+                    cv2.rectangle(displayFrame, (startX, startY), (endX, endY),
                                   COLORS[idx], 2)
                     y = startY - 15 if startY - 15 > 15 else startY + 15
-                    cv2.putText(npImg, label, (startX, y),
+                    cv2.putText(displayFrame, label, (startX, y),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
 
             # Forced garbage cleanup every second
@@ -164,7 +169,7 @@ def main():
 
             # See visually what the Aimbot sees
             if visuals:
-                cv2.imshow('Live Feed', npImg)
+                cv2.imshow('Live Feed', displayFrame)
                 if (cv2.waitKey(1) & 0xFF) == ord('q'):
                     exit()
     camera.stop()

@@ -29,6 +29,10 @@ visuals = False
 # Smarter selection of people
 centerOfScreen = True
 
+# MAIN.PY ONLY - Local weights file, downloaded automatically on first run if missing
+# Use yolov5m.pt / yolov5l.pt for better accuracy at the cost of speed
+modelWeights = "yolov5s.pt"
+
 # ONNX ONLY - Choose 1 of the 3 below
 # 1 - CPU
 # 2 - AMD
