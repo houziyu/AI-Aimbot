@@ -3,7 +3,7 @@
 import logging
 import time
 
-from runtime import PerformanceStats, Settings, prepare_frame, select_target
+from runtime import AimController, PerformanceStats, Settings, prepare_frame
 
 
 class WindowsControls:
@@ -33,14 +33,14 @@ def draw_targets(cv2, bgr, targets):
         left, top = int(x - width / 2), int(y - height / 2)
         right, bottom = int(x + width / 2), int(y + height / 2)
         cv2.rectangle(display, (left, top), (right, bottom), color, 2)
-        cv2.putText(display, f"Human: {confidence:.1%}", (left, max(15, top - 5)),
+        cv2.putText(display, f"Target: {confidence:.1%}", (left, max(15, top - 5)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
     return display
 
 
 def run_loop(settings, backend, capture, controls, cv2):
     """Own capture cleanup on failures, keyboard interrupts, and preview exits."""
-    previous = None
+    controller = AimController(settings)
     revision = capture.revision
     stats = PerformanceStats()
     count = 0
@@ -48,15 +48,21 @@ def run_loop(settings, backend, capture, controls, cv2):
     try:
         while not controls.should_quit():
             started = time.perf_counter()
-            frame = capture.read()
-            if frame is None:
-                previous = None
+            packet = capture.read()
+            if packet is None:
+                controller.idle(time.perf_counter(), paused=not capture.is_current())
+                # Keep the preview responsive even while capture is paused/static.
+                if settings.visuals and (cv2.waitKey(1) & 0xFF) == ord(settings.aaQuitKey.lower()):
+                    break
                 continue
             captured = time.perf_counter()
             if revision != capture.revision:
-                previous = None
+                controller.reset()
                 revision = capture.revision
-            rgb, bgr = prepare_frame(frame, settings)
+            if not controller.is_fresh(packet.captured_at, captured):
+                controller.reset()
+                continue
+            rgb, bgr = prepare_frame(packet.image, settings)
             image = backend.preprocess(rgb)
             if settings.performanceDisplay:
                 backend.synchronize()
@@ -66,22 +72,18 @@ def run_loop(settings, backend, capture, controls, cv2):
                 backend.synchronize()
             inferred = time.perf_counter()
             targets = backend.postprocess(prediction)
-            target = select_target(targets, settings.center, previous, settings.centerOfScreen)
             postprocessed = time.perf_counter()
 
             # The selected window may have moved or lost focus during inference.
-            if capture.is_current() and not controls.should_quit():
-                if target is None:
-                    previous = None
+            current = capture.is_current() and not controls.should_quit()
+            decision = controller.update(targets, packet.captured_at, time.perf_counter(),
+                                         enabled=controls.enabled(), current=current)
+            if decision.dx or decision.dy:
+                # A second age check covers time spent in selection/control calculations.
+                if controller.is_fresh(packet.captured_at, time.perf_counter()):
+                    controls.move(decision.dx, decision.dy)
                 else:
-                    x, y, _, height, _ = target
-                    previous = (float(x), float(y))
-                    offset = height * (0.38 if settings.headshot_mode else 0.2)
-                    if controls.enabled():
-                        controls.move(int((x - settings.center[0]) * settings.aaMovementAmp),
-                                      int((y - offset - settings.center[1]) * settings.aaMovementAmp))
-            else:
-                previous = None
+                    controller.reset()
 
             preview_quit = False
             if settings.visuals:
@@ -91,7 +93,8 @@ def run_loop(settings, backend, capture, controls, cv2):
             if settings.performanceDisplay:
                 stats.record({"capture": captured - started, "preprocess": preprocessed - captured,
                               "inference": inferred - preprocessed, "postprocess": postprocessed - inferred,
-                              "total": finished - started})
+                              "total": finished - started,
+                              "frame_age": finished - packet.captured_at})
             count += 1
             elapsed = finished - report_start
             if elapsed >= 1:

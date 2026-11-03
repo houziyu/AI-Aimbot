@@ -89,6 +89,18 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(targets.shape, (1, 5))
         np.testing.assert_allclose(targets[0], [100, 120, 40, 60, .81], rtol=1e-5)
 
+    def test_configured_class_is_selected_and_out_of_range_class_fails(self):
+        backend = Backend()
+        backend.settings = Settings(targetClasses=(1,))
+        raw = np.array([[[100, 120, 40, 60, .9, .9, .1],
+                         [250, 120, 30, 40, .9, .1, .9]]], dtype=np.float32)
+        result = backend.postprocess(raw)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0, 0], 250)
+        backend.settings = Settings(targetClasses=(2,))
+        with self.assertRaisesRegex(ValueError, "classes"):
+            backend.postprocess(raw)
+
 
 if __name__ == "__main__":
     unittest.main()

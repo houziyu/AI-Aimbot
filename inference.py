@@ -30,10 +30,15 @@ class Backend:
 
         if isinstance(prediction, np.ndarray):
             prediction = torch.from_numpy(prediction)
+        raw = prediction[0] if isinstance(prediction, (list, tuple)) else prediction
+        if raw.ndim != 3 or raw.shape[0] != 1 or raw.shape[2] < 6:
+            raise ValueError("Expected raw YOLOv5 output [1, boxes, 5 + classes]")
+        if max(self.settings.targetClasses) >= raw.shape[2] - 5:
+            raise ValueError(f"targetClasses {self.settings.targetClasses} exceed the model's {raw.shape[2] - 5} classes")
         with torch.inference_mode():
             detections = non_max_suppression(
                 prediction, self.settings.confidence, self.settings.iouThreshold,
-                classes=[0], max_det=self.settings.maxDetections,
+                classes=list(self.settings.targetClasses), max_det=self.settings.maxDetections,
             )[0]
         # One bulk transfer after NMS, rather than synchronizing for every coordinate.
         return detections_to_targets(detections.detach().float().cpu().numpy())

@@ -2,6 +2,8 @@
 
 import time
 
+from capture_stream import LatestFrameStream
+
 
 def capture_region(window_rect, monitor_rect, width, height):
     """Translate desktop coordinates to coordinates local to the capture output."""
@@ -28,6 +30,7 @@ class CaptureSession:
         self.running = False
         self.closed = False
         self.pause_reason = None
+        self.stream = LatestFrameStream(camera, settings.captureFps)
 
     def _window_region(self):
         if not self.windows.IsWindow(self.hwnd) or self.windows.IsIconic(self.hwnd):
@@ -54,7 +57,7 @@ class CaptureSession:
             reason = "Window is minimized, too small, or outside the selected capture output"
         if reason:
             if self.running:
-                self.camera.stop()
+                self.stream.stop()
                 self.running = False
             if reason != self.pause_reason:
                 print(f"Capture paused: {reason}")
@@ -64,27 +67,19 @@ class CaptureSession:
         self.pause_reason = None
         if not self.running or region != self.region:
             if self.running:
-                self.camera.stop()
+                self.stream.stop()
             self.camera.region = region
-            self.camera.start(region=region, target_fps=self.settings.captureFps, video_mode=False)
+            self.stream.start(region)
             self.running = True
             self.region = region
             self.revision += 1
-        # BetterCam 1.0.0 has no timeout in get_latest_frame. Keep its version-specific
-        # event access here so hotkeys remain responsive when the desktop is static.
-        available = self.camera._BetterCam__frame_available
-        if not available.wait(timeout=0.1):
-            if not self.camera.is_capturing:
-                raise RuntimeError("The screen capture worker stopped unexpectedly")
-            return None
-        if not self.camera.is_capturing:
-            raise RuntimeError("The screen capture worker stopped unexpectedly")
-        return self.camera.get_latest_frame()
+        return self.stream.read(timeout=0.1)
 
     def close(self):
         if not self.closed:
-            self.closed = True
+            self.stream.stop()
             self.camera.release()
+            self.closed = True
             self.running = False
 
 
@@ -124,7 +119,7 @@ def open_capture(settings):
 
     window = select_window()
     camera = bettercam.create(device_idx=settings.captureDevice, output_idx=settings.captureOutput,
-                              output_color="BGRA", max_buffer_len=settings.captureBuffer)
+                              output_color="BGR", max_buffer_len=settings.captureBuffer)
     if camera is None:
         raise RuntimeError("BetterCam could not create a screen capture device")
     try:

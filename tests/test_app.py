@@ -5,14 +5,18 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 from app import WindowsControls, run_loop
-from runtime import Settings
+from runtime import CapturedFrame, Settings
 
 
 class LoopTests(unittest.TestCase):
     def setUp(self):
         self.settings = Settings(cpsDisplay=False)
+        self.clock = 1.0
+        timer = patch("app.time.perf_counter", side_effect=lambda: self.clock)
+        timer.start()
+        self.addCleanup(timer.stop)
         self.capture = Mock(revision=0)
-        self.capture.read.return_value = np.zeros((320, 320, 4), dtype=np.uint8)
+        self.capture.read.return_value = CapturedFrame(np.zeros((320, 320, 4), dtype=np.uint8), .99)
         self.capture.is_current.return_value = True
         self.backend = Mock()
         self.backend.postprocess.return_value = np.array([[200, 180, 40, 60, .9]], dtype=np.float32)
@@ -58,7 +62,7 @@ class LoopTests(unittest.TestCase):
         self.assert_cleaned()
 
     def test_invalid_frame_cleans_up(self):
-        self.capture.read.return_value = np.zeros((10, 10, 4), dtype=np.uint8)
+        self.capture.read.return_value = CapturedFrame(np.zeros((10, 10, 4), dtype=np.uint8), .99)
         with self.assertRaises(ValueError):
             self.run_loop()
         self.assert_cleaned()
@@ -88,6 +92,44 @@ class LoopTests(unittest.TestCase):
         self.controls.should_quit.side_effect = [False, True]
         self.run_loop()
         self.backend.infer.assert_not_called()
+        self.assert_cleaned()
+
+    def test_stale_frame_skips_inference(self):
+        self.clock = 2.0
+        self.controls.should_quit.side_effect = [False, True]
+        self.run_loop()
+        self.backend.infer.assert_not_called()
+        self.controls.move.assert_not_called()
+
+    def test_inference_stall_blocks_old_result(self):
+        def slow_infer(image):
+            self.clock += .2
+            return None
+        self.backend.infer.side_effect = slow_infer
+        self.run_loop()
+        self.controls.move.assert_not_called()
+
+    def test_timeout_keeps_selection_but_never_sends_old_command(self):
+        source = self.capture.read.return_value.image
+        frames = iter([(1.0, CapturedFrame(source, 1.0)), (1.1, None),
+                       (1.15, CapturedFrame(source, 1.15))])
+        def read():
+            self.clock, packet = next(frames)
+            return packet
+        self.capture.read.side_effect = read
+        self.backend.postprocess.side_effect = [np.array([[240, 160, 20, 40, .9]]),
+                                               np.array([[160, 160, 20, 40, .9], [240, 160, 20, 40, .9]])]
+        self.controls.should_quit.side_effect = [False, False, False, False, False, True]
+        self.run_loop(headAimOffset=0, targetRadius=0)
+        self.assertEqual(self.controls.move.call_count, 2)
+        self.assertEqual(self.controls.move.call_args_list[0].args, (32, 0))
+        self.assertEqual(self.controls.move.call_args_list[1].args, (32, 0))
+
+    def test_preview_quit_works_during_capture_timeout(self):
+        self.capture.read.return_value = None
+        self.controls.should_quit.side_effect = [False]
+        self.cv2.waitKey.return_value = ord("q")
+        self.run_loop(visuals=True)
         self.assert_cleaned()
 
 

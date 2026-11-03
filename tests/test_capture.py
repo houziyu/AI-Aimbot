@@ -15,9 +15,8 @@ class CaptureTests(unittest.TestCase):
         self.origin = [100, 100]
         self.windows.ClientToScreen.side_effect = lambda hwnd, point: (point[0] + self.origin[0], point[1] + self.origin[1])
         self.camera = Mock()
-        self.camera.is_capturing = True
-        self.camera._BetterCam__frame_available.wait.return_value = True
         self.capture = CaptureSession(self.camera, 7, Settings(), self.windows, (0, 0, 1920, 1080))
+        self.stream = self.capture.stream = Mock()
 
     def test_monitor_relative_coordinates_and_boundary_checks(self):
         self.assertEqual(capture_region((-1700, 100, -900, 700), (-1920, 0, 0, 1080), 320, 320),
@@ -33,9 +32,9 @@ class CaptureTests(unittest.TestCase):
         self.assertFalse(self.capture.is_current())
         self.capture.read()
         self.assertEqual(self.capture.revision, 2)
-        self.camera.stop.assert_called_once()
-        self.assertEqual(self.camera.start.call_count, 2)
-        self.assertFalse(self.camera.start.call_args.kwargs["video_mode"])
+        self.stream.stop.assert_called_once()
+        self.assertEqual(self.stream.start.call_count, 2)
+        self.stream.start.assert_called_with(self.capture.region)
 
     @patch("gameSelection.time.sleep")
     def test_focus_loss_pauses_capture_and_resume_restarts_it(self, sleep):
@@ -43,10 +42,10 @@ class CaptureTests(unittest.TestCase):
         self.windows.GetForegroundWindow.return_value = 99
         self.assertFalse(self.capture.is_current())
         self.assertIsNone(self.capture.read())
-        self.camera.stop.assert_called_once()
+        self.stream.stop.assert_called_once()
         self.windows.GetForegroundWindow.return_value = 7
         self.capture.read()
-        self.assertEqual(self.camera.start.call_count, 2)
+        self.assertEqual(self.stream.start.call_count, 2)
 
     @patch("gameSelection.time.sleep")
     def test_minimized_and_off_output_windows_pause(self, sleep):
@@ -55,20 +54,19 @@ class CaptureTests(unittest.TestCase):
         self.windows.IsIconic.return_value = False
         self.origin[0] = -1500
         self.assertIsNone(self.capture.read())
-        self.camera.start.assert_not_called()
+        self.stream.start.assert_not_called()
 
     def test_static_desktop_wait_is_bounded(self):
-        self.camera._BetterCam__frame_available.wait.return_value = False
+        self.stream.read.return_value = None
         self.assertIsNone(self.capture.read())
-        self.camera._BetterCam__frame_available.wait.assert_called_once_with(timeout=.1)
-        self.camera.get_latest_frame.assert_not_called()
+        self.stream.read.assert_called_once_with(timeout=.1)
 
     def test_closed_window_and_dead_worker_are_reported(self):
         self.windows.IsWindow.return_value = False
         with self.assertRaisesRegex(RuntimeError, "closed"):
             self.capture.read()
         self.windows.IsWindow.return_value = True
-        self.camera.is_capturing = False
+        self.stream.read.side_effect = RuntimeError("capture worker failed")
         with self.assertRaisesRegex(RuntimeError, "worker"):
             self.capture.read()
 
