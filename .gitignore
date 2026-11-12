@@ -5,6 +5,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 artifacts/
+firmware/esp32_xy/.pio/
+firmware/esp32_xy/sdkconfig.esp32s3
+firmware/esp32_xy/sdkconfig.esp32s3.old
 
 # Additional model weights; retain the two supported bundled ONNX models
 *.onnx

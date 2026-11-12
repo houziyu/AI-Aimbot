@@ -25,6 +25,8 @@ class Runtime:
         self.commands = queue.Queue()
         self.quit = threading.Event()
         self.connected = False
+        self.ble_connected = None
+        self.protocol = ""
         self.active = False
         self.busy = False
         self.epoch = 0
@@ -52,6 +54,7 @@ class Runtime:
     def snapshot(self):
         with self.lock:
             return dict(connected=self.connected, active=self.active, busy=self.busy,
+                        ble_connected=self.ble_connected, protocol=self.protocol,
                         message=self.message, preview=self.preview, metrics=self.metrics.copy(), logs=list(self.logs))
 
     def configure(self, settings, hwnd):
@@ -82,6 +85,8 @@ class Runtime:
         with self.lock:
             if enabled and (not self.connected or self.busy or not self.hwnd):
                 raise ValueError("请先连接设备并选择目标窗口")
+            if enabled and self.ble_connected is False:
+                raise ValueError("请先连接 Windows 蓝牙中的 ESP Mouse")
             if self.active == enabled:
                 return
             self.active = enabled
@@ -115,17 +120,22 @@ class Runtime:
                         board.write_timeout = .1
                         board.timeout = 0
                         mouse = Esp32Mouse(board, flush=False)
+                        protocol = mouse.negotiate()
                         with self.lock:
+                            self.protocol = protocol
+                            self.ble_connected = mouse.ble_connected
                             self.connected, self.busy = True, False
-                            self.message = f"{value} 串口已打开；请确认 Windows 已连接 ESP Mouse。"
+                            self.message = f"{value} 已连接 · {protocol}；蓝牙状态见设备连接区。"
                         self.log(self.message)
                     elif command == "disconnect":
                         if board:
-                            board.reset_output_buffer()
+                            mouse.cancel()
                             board.close()
                         board = mouse = None
                         with self.lock:
                             self.connected, self.busy = False, False
+                            self.ble_connected = None
+                            self.protocol = ""
                             self.message = "设备已断开。"
                         self.log(self.message)
 
@@ -134,17 +144,26 @@ class Runtime:
                         ports = {p.device.lower() for p in serial.tools.list_ports.comports()}
                         if board.port.lower() not in ports:
                             raise OSError("串口设备已拔出")
-                        if board.in_waiting:
+                        if mouse.protocol == "legacy" and board.in_waiting:
                             board.read(min(board.in_waiting, 4096))
+
+                    if mouse:
+                        mouse.poll()
+                        with self.lock:
+                            self.ble_connected = mouse.ble_connected
+                            if self.active and self.ble_connected is False:
+                                raise OSError("ESP Mouse 蓝牙已断开")
 
                     with self.lock:
                         active, epoch, settings, hwnd = self.active, self.epoch, self.settings, self.hwnd
                     if epoch != local_epoch:
                         local_epoch = epoch
                         tracker.reset()
+                        if mouse:
+                            mouse.max_rate = settings.output_rate
                         sample_start, sample_count = started, 0
                         if board:
-                            board.reset_output_buffer()
+                            mouse.cancel()
                     if not active:
                         if capture:
                             capture.close()
@@ -186,10 +205,17 @@ class Runtime:
                     center = (frame.shape[1] / 2, frame.shape[0] / 2)
                     target, delta = tracker.select(detections, center, settings)
                     inference_ms = (time.monotonic() - inference_start) * 1000
+                    if target and any(delta):
+                        # A result that arrives just before the next output slot
+                        # should wait for that slot instead of losing a correction.
+                        self.quit.wait(max(0., mouse.next_move_at - time.monotonic()))
                     # Cancellation and output share a lock: a completed stop cannot be
                     # followed by an older inference result sending another command.
                     with self.lock:
-                        if not self.active or epoch != self.epoch or user32().GetForegroundWindow() != hwnd:
+                        if not self.active or epoch != self.epoch:
+                            continue
+                        if user32().GetForegroundWindow() != hwnd:
+                            tracker.reset()
                             continue
                         send_start = time.monotonic()
                         sent = mouse.move_relative(*delta) if target else False
@@ -234,6 +260,8 @@ class Runtime:
                         capture = None
                     with self.lock:
                         self.connected, self.busy = False, False
+                        self.ble_connected = None
+                        self.protocol = ""
                         self.message = str(exc)
                     self.log(f"已停止并断开设备：{exc}")
                     self.quit.wait(.05)
@@ -242,7 +270,7 @@ class Runtime:
                 capture.close()
             if board:
                 try:
-                    board.reset_output_buffer()
+                    mouse.cancel()
                 finally:
                     board.close()
             for handler in self.logger.handlers[:]:

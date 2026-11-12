@@ -51,6 +51,7 @@ def main():
                             close=lambda: None, write=lambda data: writes.append(data) or len(data))
     with ExitStack() as resources:
         resources.enter_context(patch("aim_assist.runtime.open_board", return_value=board))
+        resources.enter_context(patch("aim_assist.runtime.Esp32Mouse.negotiate", return_value="legacy"))
         resources.enter_context(patch("serial.tools.list_ports.comports", return_value=[SimpleNamespace(device="SIMULATED")]))
         if args.simulate_focus:
             api = user32()

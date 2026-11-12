@@ -167,10 +167,10 @@ class MainWindow(QMainWindow):
         fields.addWidget(label("鼠标输出方式", "muted"), 0, 0)
         fields.addWidget(label("指令串口", "muted"), 0, 1)
         transport = QComboBox()
-        transport.addItem("蓝牙 HID · w/a/s/d")
+        transport.addItem("蓝牙 HID · 自动识别固件")
         transport.addItem("USB HID · 需匹配固件")
         transport.model().item(1).setEnabled(False)
-        transport.setToolTip("当前已接入 Espressif BLE Mouse 固定步长协议。")
+        transport.setToolTip("自动识别 XY 双轴可变位移固件；兼容旧版方向固件。")
         self.port = QComboBox()
         self.port.setMinimumWidth(160)
         self.port.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -210,11 +210,13 @@ class MainWindow(QMainWindow):
         self.detail = label("", "muted", True)
         self.detail.setMinimumHeight(36)
         left.addWidget(self.detail)
-        left.addWidget(label("两个快捷键，同一个开关", "heading"))
+        left.addWidget(label("辅助快捷键", "heading"))
         keys = QHBoxLayout()
-        for text in ("鼠标右键\n按下切换", "Caps Lock\n按下切换"):
-            key = label(text, "chip")
+        self.hotkey_labels = {}
+        for name in ("鼠标右键", "Caps Lock"):
+            key = label("", "chip")
             key.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.hotkey_labels[name] = key
             keys.addWidget(key)
         left.addLayout(keys)
         left.addWidget(label("F8 随时关闭辅助", "muted"))
@@ -251,7 +253,7 @@ class MainWindow(QMainWindow):
             column.addWidget(label(note, "muted"))
             stats.addLayout(column, 1)
         metrics_box.addLayout(stats)
-        metrics_box.addWidget(label("指令到达 Windows：未测量（当前固件无接收端回执）", "muted"))
+        metrics_box.addWidget(label("XY 固件回执确认指令交给蓝牙栈；Windows 实际接收延迟仍需单独测量。", "muted", True))
         layout.addWidget(metrics)
 
     def build_settings(self):
@@ -275,14 +277,23 @@ class MainWindow(QMainWindow):
         box.addWidget(label("计算设备", "muted"))
         box.addWidget(self.provider)
         layout.addWidget(model_card)
+        hotkeys, box = card("辅助快捷键")
+        self.right_click_hotkey = QCheckBox("鼠标右键按下时切换辅助")
+        self.right_click_hotkey.setChecked(self.settings.right_click_hotkey)
+        self.caps_lock_hotkey = QCheckBox("Caps Lock 按下时切换辅助")
+        self.caps_lock_hotkey.setChecked(self.settings.caps_lock_hotkey)
+        box.addWidget(self.right_click_hotkey)
+        box.addWidget(self.caps_lock_hotkey)
+        box.addWidget(label("右键用于开镜时，建议关闭右键快捷键，使用 Caps Lock 控制辅助。F8 随时关闭辅助。", "muted", True))
+        layout.addWidget(hotkeys)
         parameters, box = card("辅助参数")
         grid = QGridLayout()
         self.inputs = {}
         specs = (("strength", "移动倍率", .05, 1., .05), ("confidence", "识别置信度", .1, .95, .05),
                  ("aim_height", "瞄准高度 · 从框顶部计，0.30 为上身", .05, .5, .01), ("deadzone", "死区 · 截图像素", 0, 100, 1),
                  ("radius", "选取半径 · 截图像素", 10, 640, 5), ("crop_size", "截图边长 · 像素", 160, 1280, 32),
-                 ("max_step", "修正值上限 · 协议量化前", 1, 100, 1), ("mask_width", "遮罩宽度 · 像素", 0, 1280, 10),
-                 ("mask_height", "遮罩高度 · 像素", 0, 1280, 10))
+                 ("max_step", "每轴修正上限 · counts", 1, 100, 1), ("mask_width", "遮罩宽度 · 像素", 0, 1280, 10),
+                 ("mask_height", "遮罩高度 · 像素", 0, 1280, 10), ("output_rate", "位移发送上限 · 条 / 秒", 30, 60, 5))
         for index, (key, text, low, high, step) in enumerate(specs):
             field = QDoubleSpinBox() if isinstance(low, float) else QSpinBox()
             field.setRange(low, high)
@@ -303,14 +314,15 @@ class MainWindow(QMainWindow):
         mask_row.addWidget(self.mask)
         mask_row.addWidget(self.mask_side)
         box.addLayout(mask_row)
-        box.addWidget(label("当前固件每条指令固定移动约 10 counts，最多 30 条 / 秒；倍率影响量化前修正值，不能改变固件步长。", "muted", True))
+        box.addWidget(label("XY 固件支持双轴可变位移，倍率和修正上限直接影响位移。旧版方向固件每步约 10 counts。", "muted", True))
         layout.addWidget(parameters)
         self.save_button = button("保存并应用", self.apply_settings, "primary")
         self.settings_feedback = label("", "muted", True)
         layout.addWidget(self.settings_feedback)
         layout.addWidget(self.save_button)
         layout.addStretch()
-        self.controls = [self.model_path, self.browse_button, self.provider, self.mask, self.mask_side, self.save_button, *self.inputs.values()]
+        self.controls = [self.model_path, self.browse_button, self.provider, self.mask, self.mask_side,
+                         self.right_click_hotkey, self.caps_lock_hotkey, self.save_button, *self.inputs.values()]
 
     def build_logs(self):
         layout = self.page("运行记录", "连接、状态切换、参数调整与错误详情。")
@@ -393,6 +405,7 @@ class MainWindow(QMainWindow):
             if not path.is_file() or path.suffix.lower() != ".onnx":
                 raise ValueError("请选择存在的 .onnx 模型文件")
             updated = replace(self.settings, model=str(path), provider=self.provider.currentData(), port=self.port.currentData() or "",
+                              right_click_hotkey=self.right_click_hotkey.isChecked(), caps_lock_hotkey=self.caps_lock_hotkey.isChecked(),
                               mask=self.mask.isChecked(), mask_side=self.mask_side.currentData(), **{key: widget.value() for key, widget in self.inputs.items()}).validate()
             self.runtime.configure(updated, self.window.currentData() or 0)
             save_settings(updated)
@@ -411,6 +424,10 @@ class MainWindow(QMainWindow):
             pressed = {key: bool(self.api.GetAsyncKeyState(key) & 0x8000) for key in self.key_down}
             rising = {key for key in pressed if pressed[key] and not self.key_down[key]}
             self.key_down = pressed
+            if not self.settings.right_click_hotkey:
+                rising.discard(2)
+            if not self.settings.caps_lock_hotkey:
+                rising.discard(20)
             if 119 in rising:
                 self.runtime.set_active(False, "F8")
             elif rising.intersection({2, 20}) and self.runtime.snapshot()["connected"]:
@@ -422,6 +439,8 @@ class MainWindow(QMainWindow):
     def render(self):
         state = self.runtime.snapshot()
         active, connected, busy = state["active"], state["connected"], state["busy"]
+        for name, enabled in (("鼠标右键", self.settings.right_click_hotkey), ("Caps Lock", self.settings.caps_lock_hotkey)):
+            self.hotkey_labels[name].setText(name + ("\n按下切换" if enabled else "\n已禁用"))
         self.power_label.setText("已开启" if active else "已关闭")
         self.power.setText("关闭辅助" if active else "开启辅助")
         self.power.setEnabled(connected and not busy)
@@ -429,7 +448,12 @@ class MainWindow(QMainWindow):
         self.connect_button.setEnabled(not busy)
         self.port.setEnabled(not connected and not busy)
         self.refresh_button.setEnabled(not connected and not busy)
-        self.device_status.setText("串口已打开 · 蓝牙配对状态请在 Windows 中确认" if connected else "设备未连接 · USB 串口发送指令，蓝牙 HID 返回位移")
+        device_text = "设备未连接 · USB 串口发送指令，蓝牙 HID 返回位移"
+        if connected:
+            device_text = "旧版方向固件 · 蓝牙配对状态请在 Windows 中确认"
+            if state["protocol"] == "xy1":
+                device_text = "XY 双轴可变位移 · " + ("蓝牙已连接" if state["ble_connected"] else "等待蓝牙连接")
+        self.device_status.setText(device_text)
         if state["message"] != self.last_message:
             self.detail.setText(state["message"])
             self.last_message = state["message"]

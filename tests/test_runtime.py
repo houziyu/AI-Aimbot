@@ -27,6 +27,7 @@ def rig(monkeypatch, tmp_path):
                             close=lambda: None, write=lambda value: writes.append(value) or len(value))
     monkeypatch.setattr(module, "CONFIG_PATH", tmp_path / "settings.json")
     monkeypatch.setattr(module, "open_board", lambda port: board)
+    monkeypatch.setattr(module.Esp32Mouse, "negotiate", lambda self: "legacy")
     ports = [SimpleNamespace(device="COM_TEST")]
     monkeypatch.setattr(module.serial.tools.list_ports, "comports", lambda: ports)
     monkeypatch.setattr(module, "user32", lambda: SimpleNamespace(GetForegroundWindow=lambda: 42))
@@ -77,6 +78,27 @@ def test_output_and_disconnect(rig):
     wait_for(lambda: not runtime.snapshot()["connected"])
     time.sleep(.1)
     assert len(writes) == count
+
+
+def test_fast_detection_waits_for_next_output_slot(rig, monkeypatch):
+    runtime, _, release, _, _ = rig
+    runtime.configure(replace(Settings(), rate=120, output_rate=30), 42)
+    ready_at_send = []
+
+    def move_when_ready(mouse, *delta):
+        now = time.monotonic()
+        ready = now >= mouse.next_move_at
+        ready_at_send.append(ready)
+        if ready:
+            mouse.next_move_at = now + 1 / mouse.max_rate
+        return ready
+
+    monkeypatch.setattr(module.Esp32Mouse, "move_relative", move_when_ready)
+    release.set()
+    runtime.set_active(True)
+    wait_for(lambda: len(ready_at_send) >= 4)
+    runtime.set_active(False)
+    assert all(ready_at_send)
 
 
 def test_unplug_while_idle(rig):

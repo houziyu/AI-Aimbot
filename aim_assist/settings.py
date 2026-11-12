@@ -25,8 +25,15 @@ class Settings:
     mask_side: str = "left"
     mask_width: int = 80
     mask_height: int = 200
+    right_click_hotkey: bool = False
+    caps_lock_hotkey: bool = True
+    output_rate: int = 60
 
     def validate(self):
+        if type(self.output_rate) is not int or not 30 <= self.output_rate <= 60:
+            raise ValueError("位移发送上限必须为 30–60 条 / 秒")
+        if not isinstance(self.right_click_hotkey, bool) or not isinstance(self.caps_lock_hotkey, bool):
+            raise ValueError("快捷键开关必须为布尔值")
         if self.rate not in (30, 60, 120):
             raise ValueError("识别频率必须为 30、60 或 120")
         for name, low, high in (("crop_size", 160, 1280),
