@@ -1,196 +1,111 @@
-> [!CAUTION]
-> # This tool is No Longer Supported by RootKit
-> We will not offer help for issues that arise with this program, or assist in getting it running on your machine.
-> You are free to fork and edit this tool yourself.
+# 准星助手 · ESP32 桌面版
 
-# 🎯 World's Best AI Aimbot 🎮
+基于现有 AI-Aimbot 新增的 Windows 桌面程序，按照提供的「准星助手」UI 原型实现控制台、参数设置和运行记录。通过目标窗口截图进行 YOLOv5 ONNX 人物检测，再沿用已经跑通的 ESP32 蓝牙鼠标串口协议发送修正指令。
 
-![World's Best AI Aimbot Banner](imgs/banner.png)
+**桌面入口：`main_ui.py`，双击入口：`start_ui.bat`。** 项目已精简为桌面版，旧命令行入口、训练/导出代码和无关示例已移除。参数统一通过界面设置。
 
-[![Pull Requests Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](https://makeapullrequest.com)
+## 已实现功能
 
+- 真实串口扫描、连接/断开、目标窗口选择。
+- 右键或 Caps Lock 按下时切换同一个辅助状态；F8 关闭辅助。
+- 目标窗口客户区中心截图，支持窗口移动、截图尺寸调整和底部遮罩。
+- ONNX FP16/FP32 输入适配、RGB 预处理、等比例缩放补边、人物筛选和 NMS。
+- 范围内优先选择接近准星的目标，通过相邻帧位置保持目标；支持瞄准高度、死区、移动倍率与修正上限。
+- 30 / 60 / 120 次每秒识别上限；设备发送单独限制为最多 30 条每秒。
+- 真实截图预览、检测框、瞄准点、识别频率和耗时统计。
+- 关闭后停止新截图、识别与发送，丢弃尚未发送的旧推理结果；窗口不在前台时暂停截图和输出。
+- 串口拔出或运行异常时自动关闭辅助、释放串口并记录错误。
+- 本地配置持久化、最近 200 条事件和轮转日志。
 
-Want to make your own bot? Then use the [Starter Code Pack](https://github.com/RootKit-Org/AI-Aimbot-Starter-Code)!
---
---
-## 🙌 Welcome Aboard!
-We're a charity on a mission to educate and certify the upcoming wave of developers in the world of Computer Engineering 🌍. ~~Need assistance? Hop into our [Discord](https://discord.gg/rootkitorg) and toss your questions at `@Wonder` in the *#ai-aimbot channel* (be sure to stick to this channel or face the consequences! 😬). Type away your query and include `@Wonder` in there.~~
+## 快速安装
 
-Our *AI Aimbot* 🤖 sharpshoots targets in **any game with humanoid characters**, harnessing the power of [YOLOv5](https://github.com/ultralytics). Currently, it's a ninja against anti-cheat systems, as it's visual-only. Still, watch out for manual player reports! 👀
+环境：Windows 10/11、64 位 Python。当前开发验证使用 Python 3.13；先用 CPU 完成配置，再考虑 GPU。
 
-Intended for educational use 🎓, our aim is to highlight the vulnerability of game devs to AI-driven cheats. Pass it along to your game developer buddies, and save their games from being outsmarted!
+在项目目录打开 PowerShell：
 
-**⚠ Use at your own risk! If you're caught... well, you've been warned!**
-
-## 📹 Instructional Media
-- [Watch the tutorial video (Works But Outdated)](https://www.youtube.com/watch?v=TCJHLbbeLhg)
-- [Watch the live stream explainer (Works But Outdated)](https://www.youtube.com/watch?v=uniL5yR7y0M&ab_channel=RootKit)
-- [Join the Discord](https://discord.gg/rootkitorg)
-
-## There are 3 Versions 🚀🚦🖥️
-- Fast 🏃‍♂️ - `main.py` ✅ Easy to set up, Works on any computer 💻
-- Faster 🏃‍♂️💨 - `main_onnx.py` ⚙️ May need to edit a file, Works on any computer 💻
-- Fastest 🚀 - `main_tensorrt.py` 🏢 Enterprise level hard, Works on computers with Nvidia GPUs only 🎮
-
-## 🧰 Requirements
-- Nvidia RTX 980 🆙, higher or equivalent
-- And one of the following:
-  - Nvidia CUDA Toolkit 11.8 [DOWNLOAD HERE](https://developer.nvidia.com/cuda-11-8-0-download-archive)
-
-## 🚀 Pre-setup Steps
-1. Download and Unzip the AI Aimbot and stash the folder somewhere handy 🗂️.
-2. Ensure you've got Python installed (like a pet python 🐍) – grab version 3.11 [HERE](https://www.python.org/downloads/release/python-3116/).
-   - 🛑 Facing a `python is not recognized...` error? [WATCH THIS!](https://youtu.be/E2HvWhhAW0g)
-   - 🛑 Is it a `pip is not recognized...` error? [WATCH THIS!](https://youtu.be/zWYvRS7DtOg)
-3. Fire up `PowerShell` or `Command Prompt` on Windows 🔍.
-4. To install `PyTorch`, select the appropriate command based on your GPU.
-    - Nvidia `pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118`
-    - AMD or CPU `pip install torch torchvision torchaudio`
-5. 📦 Run the command below to install the required Open Source packages:
-```
-pip install -r requirements.txt
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main_ui.py
 ```
 
-## 🔌 How to Run (Fast 🏃‍♂️ Version)
-Follow these steps **after** Python and all packages have been installed:
+安装完成后可以双击 `start_ui.bat`。无需激活虚拟环境，也无需安装 Torch 或 CUDA；`requirements.txt` 是唯一的运行依赖清单。
 
-1. Open `PowerShell` ⚡ or `Command Prompt` 💻.
-2. Input `cd `, then drag & drop the folder containing the bot code into the terminal.
-3. Hit Enter ↩️.
-4. Type `python main.py` and press Enter.
-5. Use **CAPS_LOCK** to toggle the aimbot 🎯. It begins in the *off* state.
-6. Pressing `q` 💣 at **ANY TIME** will shut down the program.
+仓库自带 `yolov5s320Half.onnx`（默认）及较大的 `yolov5m320Half.onnx`，可以在参数设置中选择。
 
-## 🔌 How to Run (Faster 🏃‍♂️💨 Version)
-Follow these steps **after** Python and all packages have been installed:
+## 第一次使用
 
-1. Open the `config.py` 📄 file and tweak the `onnxChoice` variable to correspond with your hardware specs:
-    - `onnxChoice = 1` # CPU ONLY 🖥
-    - `onnxChoice = 2` # AMD/NVIDIA ONLY 🎮
-    - `onnxChoice = 3` # NVIDIA ONLY 🏎️
-2. IF you have an NVIDIA set up, run the following
-    ```
-    pip install onnxruntime-gpu
-    pip install cupy-cuda11x
-    ```
-2. Follow the same steps as for the Fast 🏃‍♂️ Version above except for step 4, you will run `python main_onnx.py` instead.
+1. 将当前已能控制光标的 ESP32 接到电脑，在 Windows 蓝牙设置中确认已连接 `ESP Mouse`。
+2. 关闭 IDF Monitor、Arduino Serial Monitor、旧版辅助等占用串口的程序。
+3. 打开桌面版，刷新串口，选择对应 COM 口并点击 **连接设备**。
+4. 打开需要识别的窗口，点击 **刷新窗口**，选择该窗口。开始时可用显示人物图片的测试窗口验证检测。
+5. 参数保持默认：CPU、320 截图、置信度 0.40、倍率 0.40、死区 12。
+6. 点击 **开启辅助**，切回目标窗口。或切回目标窗口后按右键/Caps Lock 开启。
+7. 再按右键或 Caps Lock 关闭；**F8 始终只关闭**。回到助手前台会暂停截图与输出，保留开启状态。
 
+助手自身窗口处于前台时，右键和 Caps Lock 不切换辅助，避免编辑参数时误触；请使用界面按钮。快捷键不拦截原始输入，右键仍传给目标程序，Caps Lock 仍改变系统大小写状态。
 
-## 🔌 How to Run (Fastest 🚀 Version)
-Follow these sparkly steps to get your TensorRT ready for action! 🛠️✨
+完整操作、调参和排错见 **[使用教程](docs/使用教程.md)**。
 
-1. **Introduction** 🎬
-   Watch the TensorRT section of the setup [video 🎥](https://www.youtube.com/watch?v=uniL5yR7y0M&ab_channel=RootKit) before you begin. It's loaded with useful tips!
+![桌面控制台](docs/ui-console.png)
 
-2. **Oops! Don't Forget the Environment** 🌱
-   We forgot to mention adding environmental variable paths in the video. Make sure to do this part!
+## 当前硬件协议与限制
 
-3. **Get Support If You're Stumped** 🤔
-   If you ever feel lost, you can always `@Wonder` your questions in our [Discord 💬](https://discord.gg/rootkitorg). Wonder is here to help!
+```text
+Windows 截图 → ONNX 检测 → 目标选择 → USB 串口（115200）
+    → ESP32 收到 w/a/s/d → 蓝牙 HID → Windows 鼠标
+```
 
-4. **Install Cupy**
-    Run the following `pip install cupy-cuda11x`
+| 字节 | 方向 |
+| --- | --- |
+| `w` | 向上 |
+| `a` | 向左 |
+| `s` | 向下 |
+| `d` | 向右 |
 
-5. **CUDNN Installation** 🧩
-   Click to install [CUDNN 📥](https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.6/local_installers/11.x/cudnn-windows-x86_64-8.9.6.50_cuda11-archive.zip/). You'll need a Nvidia account to proceed. Don't worry it's free.
+沿用 `esp32_ble_mouse.py` 中已有的固定步长适配：每次选误差较大的一个轴，固件决定移动距离，适配器按约 10 counts 处理，每秒最多发送 30 条。**倍率和修正上限作用于量化前数值，不能让此固件执行任意 dx/dy，也不能实现同时双轴移动。** 死区用于减少准星附近来回摆动。
 
-6. **Unzip and Relocate** 📁➡️
-   Open the .zip CuDNN file and move all the folders/files to where the CUDA Toolkit is on your machine, usually at `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8`.
+串口打开只表明命令通道可用，不能证明蓝牙 HID 已连接。当前固件无心跳或 HID 接收回执，程序无法自动识别单独的蓝牙断连，无法测量指令到达 Windows 的真实延迟。UI 显示「未测量」；串口写入耗时只测量本机写调用。
 
-7. **Get TensorRT 8.6 GA** 🔽
-   Fetch [`TensorRT 8.6 GA 🛒`](https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/zip/TensorRT-8.6.1.6.Windows10.x86_64.cuda-11.8.zip).
+USB HID 选项暂不可选，需要匹配的 HID 固件/协议。继续使用已经能够控制光标的 ESP32 蓝牙鼠标固件。
 
-8. **Unzip and Relocate** 📁➡️
-   Open the .zip TensorRT file and move all the folders/files to where the CUDA Toolkit is on your machine, usually at `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8`.
+## 配置与目录
 
-9. **Python TensorRT Installation** 🎡
-   Once you have all the files copied over, you should have a folder at `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\python`. If you do, good, then run the following command to install TensorRT in python.
-   ```
-   pip install "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\python\tensorrt-8.6.1-cp311-none-win_amd64.whl"
-   ```
-    🚨 If the following steps didn't work, don't stress out! 😅 The labeling of the files corresponds with the Python version you have installed on your machine. We're not looking for the 'lean' or 'dispatch' versions. 🔍 Just locate the correct file and replace the path with your new one. 🔄 You've got this! 💪
+配置：`%LOCALAPPDATA%\AimAssist\settings.json`，日志：同目录 `runtime.log`，最多保留 2 个历史文件，每个约 1 MB。重启后辅助始终关闭，不自动连接设备；窗口句柄不持久化，需重新选择。
 
-10. **Set Your Environmental Variables** 🌎
-   Add these paths to your environment:
-   - `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\lib`
-   - `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\libnvvp`
-   - `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin`
+```text
+main_ui.py             桌面启动入口
+start_ui.bat           Windows 双击启动
+requirements.txt       运行依赖
+aim_assist/
+  ui.py                原生 PySide6 三页界面
+  runtime.py           后台识别、设备生命周期与取消控制
+  vision.py            ONNX 推理、NMS、目标选择
+  windows.py           窗口枚举、客户区坐标、前台判断
+  settings.py          配置校验与原子保存
+esp32_ble_mouse.py     现有固件协议和方向测试 CLI
+tests/                 算法、协议、后台状态回归测试
+tests/fixtures/        截图联调使用的样例图片
+tools/check_ui.py      不连接硬件的界面渲染检查
+tools/check_pipeline.py 真实截图与模型的模拟串口联调
+docs/使用教程.md        安装、操作、调参、排错
+```
 
-11. **Download Pre-trained Models** 🤖
-   You can use one of the .engine models we supply. But if it doesn't work, then you will need to re-export it. Grab the `.pt` file here for the model you want. We recommend `yolov5s.py` or `yolov5m.py` [HERE 🔗](https://github.com/ultralytics/yolov5/releases/tag/v7.0).
+## 开发验证
 
-12. **Run the Export Script** 🏃‍♂️💻
-   Time to execute `export.py` with the following command. Patience is key; it might look frozen, but it's just concentrating hard! Can take up to 20 minutes.
-   
-   ```
-   python .\export.py --weights ./yolov5s.pt --include engine --half --imgsz 320 320 --device 0
-   ```
-   
-   Note: You can pick a different YOLOv5 model size. TensorRT's power allows for larger models if desired!
+```powershell
+.\.venv\Scripts\python.exe -m pip install pytest
+.\.venv\Scripts\python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe tools/check_ui.py
+```
 
-If you've followed these steps, you should be all set with TensorRT! ⚙️🚀
+测试使用模拟串口与截图，不移动真实光标；界面检查生成 `artifacts/` 图片。真实设备、蓝牙链路和目标程序中的最终手感仍需要硬件联调。模型仅按类别 0 识别人形，不能区分敌我、阵营或遮挡关系。
 
+实际执行记录及检查边界见 [开发验证记录](docs/验证记录.md)。
 
-## ⚙️ Configurable Settings
+## 技术资料与原项目
 
-*Default settings are generally great for most scenarios. Check out the comments in the code for more insights. 🔍 The configuration settings are now located in the `config.py` file!<br>
-**CAPS_LOCK is the default for flipping the switch on the autoaim superpower! ⚙️ 🎯**
-
-`useMask` - Set to `True` or `False` to turn on and off 🎭
-
-`maskWidth` - The width of the mask to use. Only used when `useMask` is `True` 📐
-
-`maskHeight` - The height of the mask to use. Only used when `useMask` is `True` 📐
-
-`aaQuitKey` - The go-to key is `q`, but if it clashes with your game style, swap it out! ⌨️♻️
-
-`headshot_mode` - Set to `False` if you're aiming to keep things less head-on and more centered. 🎯➡️👕
-
-`cpsDisplay` - Toggle off with `False` if you prefer not to display the CPS in your command station. 💻🚫
-
-`visuals` - Flip to `True` to witness the AI's vision! Great for sleuthing out any hiccups. 🕵️‍♂️✅
-
-`aaMovementAmp` - The preset should be on point for 99% of players. Lower the digits for smoother targeting. Recommended doses: `0.5` - `2`. ⚖️🕹️
-
-`confidence` - Stick with the script here unless you're the expert. 🧐✨
-
-`screenShotHeight` - Same as above, no need for changes unless you've got a specific vision. 📏🖼️
-
-`screenShotWidth` - Keep it constant as is, unless you've got reasons to adjust. 📐🖼️
-
-`aaDetectionBox` - Default's your best bet, change only if you've got the know-how. 📦✅
-
-`onnxChoice` - Gear up for the right graphics card—Nvidia, AMD, or CPU power! 💻👾
-
-`centerOfScreen` - Keep this switched on to stay in the game's heart. ❤️🖥️
-
-## 📊 Current Stats
-
-The bot's efficiency depends on your setup. We achieved 100-150 CPS with our test specs below 🚀.
-
-    - AMD Ryzen 7 2700
-    - 64 GB DDR4
-    - Nvidia RTX 3080
-
-💡 Tip: Machine Learning can be tricky, so reboot if you keep hitting CUDA walls.
-
-## 🤝 Community Based
-
-We're all about collaboration. Your contributions can earn you credit and potential 💰!
-
-**Want to volunteer? Have video or program ideas? Tell us!**
-
-## ⚠️ Known Cheat-Detectable Games
-
-Splitgate (reported by a Discord user 🕵️‍♂️), EQU8 detects win32 mouse movement library.
-
-## 🚀 Custom Aimbots and Models
-
-Show off your work or new models via Pull Requests in `customScripts` or `customModels` directories, respectively. Check out the `example-user` folder for guidance.
-
-## 🌠 Future Ideas
-
- - [x] Mask Player to avoid false positives
-
-
-Happy Coding and Aiming! 🎉👾
+- [ONNX Runtime Python API](https://onnxruntime.ai/docs/api/python/api_summary.html)
+- [Qt 线程与对象](https://doc.qt.io/qtforpython-6.10/overviews/qtdoc-threads-qobject.html)
+- [MSS 截图示例](https://python-mss.readthedocs.io/stable/examples.html)
+- 基于 RootKit-Org/AI-Aimbot 开发；原项目授权见 [LICENSE](LICENSE)。旧版实现可通过 Git 历史查看。
