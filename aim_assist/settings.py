@@ -28,8 +28,17 @@ class Settings:
     right_click_hotkey: bool = False
     caps_lock_hotkey: bool = True
     output_rate: int = 60
+    result_max_age_ms: int = 100
+    sound_enabled: bool = False
+    cpu_threads: int = 0
 
     def validate(self):
+        if type(self.cpu_threads) is not int or not 0 <= self.cpu_threads <= 256:
+            raise ValueError("CPU 推理线程数必须为 0–256 的整数")
+        if type(self.result_max_age_ms) is not int or not 20 <= self.result_max_age_ms <= 500:
+            raise ValueError("结果有效期必须为 20–500 毫秒")
+        if not isinstance(self.sound_enabled, bool):
+            raise ValueError("提示音开关必须为布尔值")
         if type(self.output_rate) is not int or not 30 <= self.output_rate <= 60:
             raise ValueError("位移发送上限必须为 30–60 条 / 秒")
         if not isinstance(self.right_click_hotkey, bool) or not isinstance(self.caps_lock_hotkey, bool):

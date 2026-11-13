@@ -95,7 +95,9 @@ def test_movement_restarts_gently_when_switching_targets():
     second = target(250, 110)
     opening = tracker.select([first], (160, 160), settings, now=0)[1][0]
     assert tracker.select([first], (160, 160), settings, now=.03)[1][0] > opening
-    replacement, delta = tracker.select([second], (160, 160), settings, now=.04)
+    assert tracker.select([second], (160, 160), settings, now=.04) == (None, (0, 0))
+    assert tracker.select([second], (160, 160), settings, now=.065) == (None, (0, 0))
+    replacement, delta = tracker.select([second], (160, 160), settings, now=.095)
     assert replacement is second
     assert opening <= delta[0] <= 20
 
@@ -114,8 +116,51 @@ def test_close_target_remains_selected_when_aim_leaves_circle():
     assert np.linalg.norm(np.array(edge.aim(settings.aim_height)) - (160, 160)) > settings.radius
     assert tracker.select([edge], (160, 160), settings, now=.20)[0] is edge
     assert tracker.select([], (160, 160), settings, now=.26) == (None, (0, 0))
+    # Low-rate observations get a bounded longer grace period, with zero output.
+    assert tracker.previous_detection is edge
+    assert tracker.select([], (160, 160), settings, now=.36) == (None, (0, 0))
     assert tracker.previous_detection is None
-    assert tracker.select([Detection(300, 0, 350, 320, .9)], (160, 160), settings, now=.27)[0] is None
+    assert tracker.select([Detection(300, 0, 350, 320, .9)], (160, 160), settings, now=.37)[0] is None
+
+
+@pytest.mark.parametrize("rate", [30, 60, 120])
+def test_better_target_needs_sustained_advantage(rate):
+    tracker, settings = TargetTracker(), Settings()
+    original, better = target(240, 160), target(165, 160)
+    tracker.select([original], (160, 160), settings, now=0)
+    for i in range(1, round(.1 * rate) + 1):
+        selected, _ = tracker.select([original, better], (160, 160), settings, now=i / rate)
+        assert selected is original
+    selected, _ = tracker.select([original, better], (160, 160), settings, now=.1 + 1 / rate)
+    assert selected is better
+
+
+def test_intermittent_challenger_cannot_force_switch():
+    tracker, settings = TargetTracker(), Settings()
+    original, challenger = target(240, 160), target(165, 160)
+    tracker.select([original], (160, 160), settings, now=0)
+    for i in range(1, 30):
+        candidates = [original, challenger] if i % 2 else [original]
+        assert tracker.select(candidates, (160, 160), settings, now=i / 60)[0] is original
+
+
+def test_crossing_targets_follow_motion_despite_reversed_input_order():
+    tracker, settings = TargetTracker(), replace(Settings(), radius=300)
+    tracker.select([target(120, 160)], (160, 160), settings, now=0)
+    for i in range(1, 12):
+        forward = target(120 + 8 * i, 160)
+        backward = target(220 - 8 * i, 160)
+        candidates = [forward, backward] if i % 2 else [backward, forward]
+        selected, _ = tracker.select(candidates, (160, 160), settings, now=i / 60)
+        assert selected is forward
+
+
+def test_missing_target_does_not_move_towards_unconfirmed_replacement():
+    tracker, settings = TargetTracker(), Settings()
+    tracker.select([target(240, 160)], (160, 160), settings, now=0)
+    stranger = target(90, 80)
+    for now in (.01, .02, .03):
+        assert tracker.select([stranger], (160, 160), settings, now=now) == (None, (0, 0))
 
 
 def test_settings_atomic_roundtrip_and_validation(tmp_path):

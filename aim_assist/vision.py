@@ -88,6 +88,8 @@ class Detector:
         if settings.provider not in ort.get_available_providers():
             raise ValueError(f"当前环境不可用：{settings.provider}")
         options = ort.SessionOptions()
+        if settings.provider == "CPUExecutionProvider" and settings.cpu_threads:
+            options.intra_op_num_threads = settings.cpu_threads
         if settings.provider == "DmlExecutionProvider":
             options.enable_mem_pattern = False
             options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
@@ -108,24 +110,70 @@ class Detector:
         self.width = width if isinstance(width, int) else settings.crop_size
 
     def detect(self, frame, confidence):
+        started = time.perf_counter()
         tensor, scale, left, top = letterbox(frame, self.width, self.height, self.dtype)
+        prepared = time.perf_counter()
         output = self.session.run(None, {self.input.name: tensor})[0]
-        return decode(output, confidence, scale, left, top, frame.shape)
+        inferred = time.perf_counter()
+        detections = decode(output, confidence, scale, left, top, frame.shape)
+        finished = time.perf_counter()
+        self.timings = dict(preprocess=(prepared - started) * 1000,
+                            inference=(inferred - prepared) * 1000,
+                            postprocess=(finished - inferred) * 1000)
+        return detections
 
 
 class TargetTracker:
     LOST_TARGET_GRACE = .050
     MOVEMENT_RISE_TIME = .025
+    SWITCH_HOLD = .100
+    REACQUIRE_HOLD = .050
 
     def __init__(self):
+        self.generation = 0
         self.reset()
 
     def reset(self):
+        self.generation += 1
         self.previous = None
         self.previous_detection = None
         self.last_seen = None
         self.missed = False
         self.movement = (0., 0.)
+        self.velocity = (0., 0.)
+        self.frame_interval = 1 / 60
+        self.challenger = None
+        self.challenger_since = 0.
+        self.challenger_frames = 0
+
+    @staticmethod
+    def _size(detection):
+        return math.hypot(detection.x2 - detection.x1, detection.y2 - detection.y1)
+
+    def _match(self, candidates, previous, point, height):
+        """Use size, predicted position and overlap together; overlap alone can swap IDs."""
+        size = self._size(previous)
+        gate = max(12., min(160., size * .45))
+        matches = []
+        for detection in candidates:
+            ratio = self._size(detection) / max(1., size)
+            if not .5 <= ratio <= 2.:
+                continue
+            distance = math.dist(detection.aim(height), point)
+            overlap = detection.iou(previous)
+            if distance <= gate or overlap >= .2:
+                cost = distance / gate + .25 * (1 - overlap) + .3 * abs(math.log(ratio))
+                matches.append((cost, detection))
+        return min(matches, key=lambda item: item[0])[1] if matches else None
+
+    def _confirm_challenger(self, candidate, settings, now, hold):
+        same = self.challenger is not None and self._match(
+            [candidate], self.challenger, self.challenger.aim(settings.aim_height), settings.aim_height) is not None
+        if not same:
+            self.challenger_since, self.challenger_frames = now, 0
+        self.challenger = candidate
+        self.challenger_frames += 1
+        return self.challenger_frames >= 3 and now - self.challenger_since >= hold - 1e-9
 
     def select(self, detections, center, settings, *, now=None):
         def distance(a, b):
@@ -137,27 +185,45 @@ class TargetTracker:
         # A close-up person's aim point can leave the circle while their body
         # still fills its center. Gate on the visible box instead.
         candidates = [d for d in detections if d.distance_to(center) <= settings.radius]
-        if self.last_seen is not None and (self.missed or not candidates):
-            if now - self.last_seen > self.LOST_TARGET_GRACE:
-                self.reset()
         if not candidates:
+            self.challenger = None
+            grace = max(self.LOST_TARGET_GRACE, min(.15, 3 * self.frame_interval))
+            if self.last_seen is not None and now - self.last_seen > grace:
+                self.reset()
             self.missed = self.last_seen is not None
             return None, (0, 0)
-        target = min(candidates, key=lambda d: distance(d.aim(settings.aim_height), center))
+        nearest = min(candidates, key=lambda d: distance(d.aim(settings.aim_height), center))
+        target = nearest
         retained = False
         if self.previous is not None:
-            previous = min(candidates, key=lambda d: distance(d.aim(settings.aim_height), self.previous))
-            if distance(previous.aim(settings.aim_height), self.previous) <= 45:
-                target = previous
-                retained = True
-            overlapping = max(candidates, key=lambda d: d.iou(self.previous_detection))
-            if overlapping.iou(self.previous_detection) >= .2:
-                target = overlapping
-                retained = True
+            horizon = min(.05, max(0., now - self.last_seen))
+            predicted = tuple(p + v * horizon for p, v in zip(self.previous, self.velocity))
+            matched = self._match(candidates, self.previous_detection, predicted, settings.aim_height)
+            if matched is None:
+                self.missed = True
+                if not self._confirm_challenger(nearest, settings, now, self.REACQUIRE_HOLD):
+                    return None, (0, 0)
+            else:
+                target, retained = matched, True
+                old_distance = distance(matched.aim(settings.aim_height), center)
+                new_distance = distance(nearest.aim(settings.aim_height), center)
+                advantage = max(10., self._size(matched) * .1)
+                if nearest is not matched and new_distance < old_distance * .65 and old_distance - new_distance > advantage:
+                    if self._confirm_challenger(nearest, settings, now, self.SWITCH_HOLD):
+                        target, retained = nearest, False
+                else:
+                    self.challenger = None
 
         if retained:
-            elapsed = min(now - self.last_seen, 1 / 30)
+            interval = max(1e-6, now - self.last_seen)
+            elapsed = min(interval, 1 / 30)
+            self.frame_interval = .8 * self.frame_interval + .2 * min(interval, .05)
+            observed = tuple((a - b) / interval for a, b in zip(target.aim(settings.aim_height), self.previous))
+            self.velocity = tuple(.5 * old + .5 * new for old, new in zip(self.velocity, observed))
         else:
+            self.generation += 1
+            self.challenger = None
+            self.velocity = (0., 0.)
             self.movement = (0., 0.)
             elapsed = 1 / 120
         self.last_seen = now

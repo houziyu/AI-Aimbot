@@ -1,0 +1,69 @@
+{
+  "reviewed_on": "2026-11-13",
+  "purpose": "Offline local evaluation. Media copyright remains with respective owners. No media redistributed in repository.",
+  "images": [
+    {
+      "file": "screenshot-0.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172470/61bab081f3fdc1373da42fa962497ed2ea760890/ss_61bab081f3fdc1373da42fa962497ed2ea760890.1920x1080.jpg?t=1794339458",
+      "source_page": "https://store.steampowered.com/app/1172470/Apex_Legends/",
+      "kind": "publisher promotional screenshot",
+      "sha256": "d635dc74e946d8eefcc168cb4d6a3c22c2f71c3f525e5d8f28a85ca1adff10be"
+    },
+    {
+      "file": "screenshot-1.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172470/51c8778e7d61d7834436c2e68084b17243711505/ss_51c8778e7d61d7834436c2e68084b17243711505.1920x1080.jpg?t=1794339458",
+      "source_page": "https://store.steampowered.com/app/1172470/Apex_Legends/",
+      "kind": "publisher promotional screenshot",
+      "sha256": "25c297ab5827aa46301f7ff16d7e9e832d902f00cfbe62a98676fe5c490553be"
+    },
+    {
+      "file": "screenshot-2.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172470/f591a8185a61079f0d43ef2a59002f00ef496ffd/ss_f591a8185a61079f0d43ef2a59002f00ef496ffd.1920x1080.jpg?t=1794339458",
+      "source_page": "https://store.steampowered.com/app/1172470/Apex_Legends/",
+      "kind": "publisher promotional screenshot",
+      "sha256": "a13fd2f5d2536ecbe0e9034a322b6e7706dcea31621eef5767e4352b22f12c59"
+    },
+    {
+      "file": "screenshot-3.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172470/756eb71fa6a7f567f132d26c8bfea5c2ff0dee0d/ss_756eb71fa6a7f567f132d26c8bfea5c2ff0dee0d.1920x1080.jpg?t=1794339458",
+      "source_page": "https://store.steampowered.com/app/1172470/Apex_Legends/",
+      "kind": "publisher promotional screenshot",
+      "sha256": "ec792b5422f13b5d5218cdf501606536366193b136343f809a2e61c2af33b0fb"
+    },
+    {
+      "file": "screenshot-4.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172470/990eed82d89b5c403168804b6b891cb7acc93426/ss_990eed82d89b5c403168804b6b891cb7acc93426.1920x1080.jpg?t=1794339458",
+      "source_page": "https://store.steampowered.com/app/1172470/Apex_Legends/",
+      "kind": "publisher promotional screenshot",
+      "sha256": "eadb89f9ead6fc19056274a2093a34fade52e275a3211ec9fcd313f45f5140ea"
+    },
+    {
+      "file": "combat-corridor.png",
+      "url": "https://assets.st-note.com/img/1717120009349-2HQHPGTk5e.png",
+      "source_page": "https://note.com/aktamax/n/nb88716b87775",
+      "kind": "first-person gameplay",
+      "sha256": "7b9e54108a4652d707179f18295aa3de41dc6f7ed0d86554d843c2ffb5ccf565"
+    },
+    {
+      "file": "combat-kings-canyon.jpg",
+      "url": "https://img.redbull.com/images/c_limit%2Cw_1500%2Ch_1000/f_auto%2Cq_auto/redbullcom/2020/5/13/w2rfukuzfrcobsutzmn2/kings-canyon-season-5",
+      "source_page": "https://www.redbull.com/gb-en/apex-legends-best-places-to-land",
+      "kind": "first-person gameplay",
+      "sha256": "042de0662c7f578a1416f6c9095e50d2f8840355bdfa67f3773cfa2da9b2a963"
+    },
+    {
+      "file": "combat-scope.jpg",
+      "url": "https://images.cgames.de/images/gsgp/287/apex-legends_6057811.jpg",
+      "source_page": "https://www.gamepro.de/galerien/apex_legends%2C133900.html",
+      "kind": "first-person gameplay",
+      "sha256": "15f231a5da959ac78774fe4d4b6c1ab6d7108b78546c478df300fb51654f4b34"
+    }
+  ],
+  "video": {
+    "file": "cipher-gameplay-1080p.mp4",
+    "name": "Apex Legends: Cipher Gameplay Trailer WW ",
+    "source_page": "https://store.steampowered.com/app/1172470/Apex_Legends/",
+    "playlist": "https://video.akamai.steamstatic.com/store_trailers/1172470/756891131/fee6a815b821b7a2d21ecba7f994564efe82cd12/1793730568/hls_264_0_video.m3u8",
+    "sha256": "ab98e078f9ce46e1086a6a7b7577610379fb1d25bc33360befff6c6ed345888f"
+  }
+}

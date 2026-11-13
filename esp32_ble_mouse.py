@@ -2,6 +2,7 @@
 
 import argparse
 import binascii
+import math
 import secrets
 import sys
 import time
@@ -15,6 +16,18 @@ COMMANDS = {
     "down": b"s",
     "right": b"d",
 }
+
+
+class BleDisconnectedError(serial.SerialException):
+    """Bluetooth is unavailable, but the serial session can stay open."""
+
+
+class AckTimeoutError(serial.SerialTimeoutException):
+    """A request was not acknowledged within the host timeout."""
+
+    def __init__(self, kind):
+        super().__init__("ESP32 回执超时，已停止发送")
+        self.kind = kind
 
 
 def encode_frame(body: str) -> bytes:
@@ -57,6 +70,8 @@ class Esp32Mouse:
     """Negotiate XY1, with a fixed-step fallback for the legacy demo."""
 
     STEP_COUNTS = 10
+    ACK_TIMEOUT = .25
+    MAX_COMMAND_AGE_MS = 80
 
     def __init__(self, board: serial.Serial, *, flush: bool = True, max_rate: int = 60):
         if type(max_rate) is not int or not 30 <= max_rate <= 60:
@@ -75,11 +90,20 @@ class Esp32Mouse:
         self.reply_at = 0.
         self.last_status = ""
         self.ack_ms = 0.
+        self.ack_count = 0
+        self.ack_kind = ""
+        self.pending_kind = ""
 
-    def _write_frame(self, body):
-        packet = encode_frame(body)
+    def _write_frame(self, body, *, resync=False, expires_at=None, can_send=None):
+        packet = (b"!\n" if resync else b"") + encode_frame(body)
+        if can_send is not None and not can_send():
+            return None
+        started = time.monotonic()
+        if expires_at is not None and started >= expires_at:
+            return None
         if self.board.write(packet) != len(packet):
             raise serial.SerialTimeoutException("串口协议帧写入不完整")
+        return started
 
     def _responses(self):
         if self.board.in_waiting:
@@ -112,57 +136,80 @@ class Esp32Mouse:
             time.sleep(.005)
         return self.protocol
 
-    def _request(self, kind, dx=0, dy=0):
+    def _request(self, kind, dx=0, dy=0, *, expires_at=None, can_send=None):
         now = time.monotonic()
-        self.sequence = (self.sequence + 1) & 0xffffffff
-        deadline = (self.board_clock + int((now - self.reply_at) * 1000) + 80) & 0xffffffff
-        self._write_frame(f"{kind} {self.token} {self.sequence} {deadline} {dx} {dy}")
-        self.pending = (self.sequence, now)
+        # The reported board clock precedes host receipt. Anchor the deadline
+        # to that sample so reply transit and polling cannot extend freshness.
+        wire_expiry = now + self.MAX_COMMAND_AGE_MS / 1000
+        if expires_at is not None:
+            wire_expiry = min(expires_at, wire_expiry)
+        deadline = (self.board_clock + math.floor((wire_expiry - self.reply_at) * 1000)) & 0xffffffff
+        sequence = (self.sequence + 1) & 0xffffffff
+        started = self._write_frame(f"{kind} {self.token} {sequence} {deadline} {dx} {dy}",
+                                    resync=kind == "S", expires_at=expires_at, can_send=can_send)
+        if started is None:
+            return False
+        self.sequence = sequence
+        self.pending = (sequence, started)
+        self.pending_kind = kind
+        return True
+
+    def _check_ack_timeout(self, now):
+        if self.pending and now >= self.pending[1] + self.ACK_TIMEOUT:
+            raise AckTimeoutError(self.pending_kind)
 
     def poll(self):
         if self.protocol != "xy1":
             return
+        self._check_ack_timeout(time.monotonic())
         for fields in self._responses():
             if len(fields) != 6 or fields[:2] != ["A", str(self.token)]:
                 continue
             if self.pending is None or int(fields[2]) != self.pending[0]:
                 continue
             now = time.monotonic()
+            self._check_ack_timeout(now)
             self.ack_ms = (now - self.pending[1]) * 1000
+            self.ack_count += 1
+            self.ack_kind = self.pending_kind
             self.pending = None
             self.board_clock = int(fields[3])
             self.reply_at = now
             self.ble_connected = bool(int(fields[4]))
             self.last_status = fields[5]
-            if self.last_status in ("RANGE", "SEND", "DUP", "BLE"):
+            if self.last_status == "BLE":
+                raise BleDisconnectedError("ESP Mouse 蓝牙未连接")
+            if self.last_status in ("RANGE", "SEND", "DUP"):
                 raise serial.SerialException(f"ESP32 拒绝位移：{self.last_status}")
-        if self.pending and time.monotonic() - self.pending[1] > .25:
-            raise serial.SerialTimeoutException("ESP32 回执超时，已停止发送")
-        if self.pending is None and time.monotonic() - self.reply_at > .5:
+        now = time.monotonic()
+        self._check_ack_timeout(now)
+        if self.pending is None and now - self.reply_at > .5:
             self._request("P")
 
     def cancel(self):
         self.board.reset_output_buffer()
         if self.protocol == "xy1":
-            # Supersede an outstanding response; never retry its movement.
+            # Invalidate and terminate any partial frame left by purge.
             self._request("S")
 
-    def move_relative(self, dx: int, dy: int) -> bool:
-        """Send a fresh relative correction when the device is ready."""
+    def move_relative(self, dx: int, dy: int, *, expires_at=None, can_send=None) -> bool:
+        """Write a correction before its host deadline, with a final state check."""
         if self.protocol == "xy1":
             self.poll()
             if not self.ble_connected:
-                raise serial.SerialException("ESP Mouse 蓝牙未连接")
-            if self.pending or time.monotonic() < self.next_move_at or (dx == 0 and dy == 0):
+                raise BleDisconnectedError("ESP Mouse 蓝牙未连接")
+        if self.pending or time.monotonic() < self.next_move_at or not (dx or dy):
+            return False
+        if self.protocol == "xy1":
+            if not self._request("M", max(-127, min(127, int(dx))), max(-127, min(127, int(dy))),
+                                 expires_at=expires_at, can_send=can_send):
                 return False
-            self._request("M", max(-127, min(127, int(dx))), max(-127, min(127, int(dy))))
             self.next_move_at = time.monotonic() + 1 / self.max_rate
             return True
-        if max(abs(dx), abs(dy)) < self.STEP_COUNTS / 2:
+        if can_send is not None and not can_send():
             return False
-        if time.monotonic() < self.next_move_at:
+        if (expires_at is not None and time.monotonic() >= expires_at) or max(abs(dx), abs(dy)) < self.STEP_COUNTS / 2:
             return False
-
         if abs(dx) >= abs(dy):
             direction = "right" if dx > 0 else "left"
         else:

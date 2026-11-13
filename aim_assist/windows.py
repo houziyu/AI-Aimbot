@@ -4,6 +4,14 @@ from ctypes import wintypes
 import os
 
 
+class WindowClosedError(RuntimeError):
+    """The user must select a new window; do not reuse a dead HWND."""
+
+
+class WindowCaptureError(RuntimeError):
+    """A temporary window geometry problem that can be retried."""
+
+
 def user32():
     if os.name != "nt":
         raise RuntimeError("桌面辅助目前仅支持 Windows")
@@ -41,17 +49,17 @@ def list_windows():
 def capture_region(hwnd, size, desktop):
     api = user32()
     if not hwnd or not api.IsWindow(hwnd):
-        raise RuntimeError("目标窗口已关闭，请重新选择")
+        raise WindowClosedError("目标窗口已关闭，请重新选择")
     if api.IsIconic(hwnd) or api.GetForegroundWindow() != hwnd:
         return None
     rect, origin = wintypes.RECT(), wintypes.POINT()
     if not api.GetClientRect(hwnd, ctypes.byref(rect)) or not api.ClientToScreen(hwnd, ctypes.byref(origin)):
-        raise RuntimeError("无法读取目标窗口位置")
+        raise WindowCaptureError("无法读取目标窗口位置，正在等待窗口恢复")
     width, height = rect.right, rect.bottom
     if width < size or height < size:
-        raise RuntimeError("目标窗口客户区小于截图范围，请缩小截图尺寸")
+        raise WindowCaptureError("目标窗口客户区小于截图范围；放大窗口，或停止后缩小截图尺寸")
     left = origin.x + width // 2 - size // 2
     top = origin.y + height // 2 - size // 2
     if left < desktop['left'] or top < desktop['top'] or left + size > desktop['left'] + desktop['width'] or top + size > desktop['top'] + desktop['height']:
-        raise RuntimeError("截图区域超出桌面，请将目标窗口移回屏幕")
+        raise WindowCaptureError("截图区域超出桌面，请将目标窗口移回屏幕")
     return dict(left=left, top=top, width=size, height=size)

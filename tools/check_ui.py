@@ -30,7 +30,16 @@ try:
         for _ in range(4):
             app.processEvents()
         assert window.grab().save(str(output / f"{name}.png"))
+        if index < 2:
+            scroll = window.pages.widget(index).verticalScrollBar()
+            scroll.setValue(scroll.maximum())
+            app.processEvents()
+            assert window.grab().save(str(output / f"{name}-bottom.png"))
+            scroll.setValue(0)
     window.navigate(0)
+    window.resize(1120, 1120)
+    app.processEvents()
+    assert window.grab().save(str(output / "console-full.png"))
     window.resize(940, 720)
     app.processEvents()
     assert window.grab().save(str(output / "console-small.png"))

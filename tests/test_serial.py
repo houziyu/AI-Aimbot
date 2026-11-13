@@ -52,6 +52,8 @@ class XYBoard:
         self.frames = []
         self.connected = True
         self.respond = True
+        self.input = bytearray()
+        self.move_status = "OK"
 
     @property
     def in_waiting(self):
@@ -63,13 +65,21 @@ class XYBoard:
         return data
 
     def write(self, packet):
-        fields = protocol.decode_frame(packet)
-        self.frames.append(fields)
-        if self.respond:
+        self.input.extend(packet)
+        lines = self.input.split(b"\n")
+        self.input = bytearray(lines.pop())
+        for line in lines:
+            fields = protocol.decode_frame(line)
+            if fields is None:
+                continue
+            self.frames.append(fields)
+            if not self.respond:
+                continue
             if fields[0] == "H":
                 response = f"R 1 {fields[1]} 1000 {int(self.connected)}"
             else:
-                response = f"A {fields[1]} {fields[2]} 1005 {int(self.connected)} OK"
+                status = self.move_status if fields[0] == "M" else "STATUS"
+                response = f"A {fields[1]} {fields[2]} 1005 {int(self.connected)} {status}"
             self.buffer.extend(protocol.encode_frame(response))
         return len(packet)
 
@@ -88,6 +98,8 @@ def test_xy_negotiation_small_diagonal_and_ack(monkeypatch):
     mouse.poll()
     assert mouse.pending is None
     assert mouse.last_status == "OK"
+    assert mouse.ack_kind == "M" and mouse.ack_count == 1
+    assert mouse.ack_ms >= 0
     mouse.next_move_at = 0
     assert mouse.move_relative(200, -200)
     assert board.frames[-1][-2:] == ["127", "-127"]
@@ -106,6 +118,70 @@ def test_xy_inflight_timeout_does_not_replay(monkeypatch):
     with pytest.raises(serial.SerialTimeoutException, match="回执超时"):
         mouse.poll()
     assert len(board.frames) == count
+
+
+def test_xy_late_ack_already_buffered_is_rejected(monkeypatch):
+    board = XYBoard()
+    mouse = protocol.Esp32Mouse(board, flush=False)
+    mouse.negotiate()
+    assert mouse.move_relative(10, 0)
+    assert board.in_waiting
+    monkeypatch.setattr(protocol.time, "monotonic", lambda: mouse.pending[1] + mouse.ACK_TIMEOUT)
+    with pytest.raises(serial.SerialTimeoutException, match="回执超时"):
+        mouse.poll()
+    assert mouse.ack_count == 0
+
+
+@pytest.mark.parametrize(("board_clock", "expiry", "expected"), [
+    (1000, 10.100, 1099),
+    (1000, 10.600, 1174),
+    (0xffffffc0, 10.100, 35),
+])
+def test_xy_deadline_uses_remaining_frame_age_and_wraps(monkeypatch, board_clock, expiry, expected):
+    now = [10.]
+    monkeypatch.setattr(protocol.time, "monotonic", lambda: now[0])
+    board = XYBoard()
+    mouse = protocol.Esp32Mouse(board, flush=False)
+    assert mouse.negotiate() == "xy1"
+    mouse.board_clock = board_clock
+    now[0] = 10.095
+    assert mouse.move_relative(1, -2, expires_at=expiry)
+    deadline = int(board.frames[-1][3])
+    assert deadline in (expected, expected + 1)  # Rounding down preserves the age limit.
+
+
+@pytest.mark.parametrize("mode", ["xy1", "legacy"])
+def test_send_rechecks_expiry_and_stop_after_preflight(monkeypatch, mode):
+    now = [10.]
+    monkeypatch.setattr(protocol.time, "monotonic", lambda: now[0])
+    board = XYBoard() if mode == "xy1" else Mock()
+    mouse = protocol.Esp32Mouse(board, flush=False)
+    if mode == "xy1":
+        mouse.negotiate()
+        board.frames.clear()
+
+    def delayed_preflight():
+        now[0] = 10.1
+        return True
+
+    assert not mouse.move_relative(15, 0, expires_at=10.1, can_send=delayed_preflight)
+    assert not mouse.move_relative(15, 0, can_send=lambda: False)
+    if mode == "xy1":
+        assert board.frames == []
+    else:
+        board.write.assert_not_called()
+
+
+def test_xy_cancel_invalidates_partial_frame_before_stop():
+    board = XYBoard()
+    mouse = protocol.Esp32Mouse(board, flush=False)
+    mouse.negotiate()
+    # A purged write may have already transmitted everything but its newline.
+    board.input.extend(protocol.encode_frame(f"M {mouse.token} 1 1080 10 10")[:-1])
+    mouse.cancel()
+    assert [fields[0] for fields in board.frames] == ["H", "S"]
+    mouse.poll()
+    assert mouse.pending is None and mouse.last_status == "STATUS"
 
 
 def test_xy_cancel_ignores_old_response_and_reports_disconnect():
